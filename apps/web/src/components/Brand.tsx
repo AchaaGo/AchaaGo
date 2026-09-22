@@ -1,0 +1,2 @@
+import {Truck} from 'lucide-react';
+export function Brand({light=false}:{light?:boolean}) { return <div style={{display:'flex',alignItems:'center',gap:10,color:light?'white':'var(--ink)'}}><span style={{width:40,height:40,borderRadius:11,background:'var(--accent)',display:'grid',placeItems:'center',color:'var(--ink)'}}><Truck size={24}/></span><strong className="display" style={{fontSize:19}}>AchaaGo</strong></div> }
