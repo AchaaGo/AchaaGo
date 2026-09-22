@@ -11,7 +11,7 @@ class Phone(Input):
 
 
 class OTPVerify(Phone):
-    code: str = Field(pattern=r"^[0-9]{4}$")
+    code: str = Field(min_length=2, max_length=4, pattern=r"^\d+$")
 
 
 class RefreshInput(Input):

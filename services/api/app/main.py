@@ -110,7 +110,7 @@ async def otp_request(data: Phone, request: Request):
 
 @app.post("/auth/otp/verify")
 async def otp_verify(data: OTPVerify, request: Request, response: Response, db: DB):
-    if not (settings.sms_provider == "console" and data.code == "0000"): await cache.verify_otp(data.phone, data.code, client_ip(request))
+    if not (settings.sms_provider == "console" and data.code == "00"): await cache.verify_otp(data.phone, data.code, client_ip(request))
     user = await find_user(db, data.phone)
     if not user:
         user = User(phone=data.phone)
