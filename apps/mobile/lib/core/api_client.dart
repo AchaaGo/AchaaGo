@@ -66,9 +66,11 @@ class ApiClient {
     }
 
     dynamic decoded;
-    if (response.body.isNotEmpty) {
+    // FastAPI sends `application/json` without a charset, which `response.body`
+    // would decode as Latin-1 and garble Cyrillic.
+    if (response.bodyBytes.isNotEmpty) {
       try {
-        decoded = jsonDecode(response.body);
+        decoded = jsonDecode(utf8.decode(response.bodyBytes));
       } on FormatException {
         decoded = <String, dynamic>{'detail': 'UNKNOWN'};
       }

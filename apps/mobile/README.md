@@ -11,7 +11,7 @@ both customers who prefer an app and, per `AGENTS.md`, drivers.
 ## What's implemented
 
 **Customer**
-- Phone-number login, 4-digit code verification (`0000` in development — see below)
+- Phone-number login, 4-digit code verification (`00` shortcut in development — see below)
 - Service selection (Амжиргаа / Портер, loaded from `GET /services`)
 - Pickup (device location) and drop-off address entry with search
 - Loader count, live server-priced quote, cash/QPay selection
@@ -50,16 +50,19 @@ This directory ships the Dart application (`lib/`, `test/`, `pubspec.yaml`)
 but **not** the generated native platform projects (`android/`, `ios/`):
 those are toolchain-specific (Gradle/AGP/Kotlin, Xcode) and are best
 generated fresh by the Flutter CLI you actually have installed, rather than
-committed and risking a mismatch. Generate them once:
+committed and risking a mismatch. Generate them once (also adds the location permissions and the app name
+to the Android manifest):
 
 ```bash
 cd apps/mobile
-flutter create --platforms=android,ios --org mn.achaago .
+./tool/prepare_android.sh
 flutter pub get
 ```
 
-`flutter create` on an existing project only adds the missing platform
-folders — it will not overwrite `lib/`, `test/`, or `pubspec.yaml`.
+The script runs `flutter create --platforms=android`, which only adds the
+missing platform folder — it will not overwrite `lib/`, `test/`, or
+`pubspec.yaml`. For iOS, run `flutter create --platforms=ios --org mn.achaago .`
+and add the `Info.plist` entry below by hand.
 
 Android is the priority target (`AGENTS.md`: "Android first, iOS later"),
 so that's what has been exercised while writing this app; the iOS project
@@ -69,19 +72,15 @@ here.
 ### Location permission
 
 The customer (pickup location) and driver (online location updates) flows
-use the `geolocator` plugin, which needs a permission entry once the
-platform projects exist:
+use the `geolocator` plugin. `tool/prepare_android.sh` adds the Android
+permissions. It also sets `android:usesCleartextTraffic="true"`, because the
+current server is plain `http://`; remove that once the server has HTTPS.
+iOS needs this in `ios/Runner/Info.plist`:
 
-- **Android** (`android/app/src/main/AndroidManifest.xml`), inside `<manifest>`:
-  ```xml
-  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-  ```
-- **iOS** (`ios/Runner/Info.plist`):
-  ```xml
-  <key>NSLocationWhenInUseUsageDescription</key>
-  <string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>
-  ```
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>
+```
 
 The app works without granting the permission — it falls back to a fixed
 Ulaanbaatar-center pickup point for customers, and asks the driver to grant
@@ -113,20 +112,33 @@ unlike the Android emulator it shares the host's network namespace.)
 
 ## Development OTP code
 
-The backend's console SMS provider prints the real OTP to the API/worker
-logs, **and** accepts a fixed development code regardless of what was
-generated (`services/api/app/main.py otp_verify`, gated on
-`SMS_PROVIDER=console`, which is the default in `.env.example`). That code
-is **`0000`** (four digits) — the OTP field is validated as exactly 4
-digits server-side, so `00` is not a valid request body. The verification
-screen shows this hint under the code field. No real SMS is sent or
-implemented here, per the task scope.
+While the backend runs with `SMS_PROVIDER=console`, it prints the real
+4-digit code to the API/worker logs and also accepts the shortcut code
+**`00`** (`services/api/app/main.py otp_verify`). The verification screen
+shows this hint under the code field.
 
 ## Running
 
 ```bash
 flutter run
 ```
+
+### Getting a build without installing Flutter yourself
+
+This is a native app, not a website, so it has to be installed on a phone.
+`.github/workflows/mobile-apk.yml` builds a debug APK on GitHub:
+
+1. On GitHub, open **Actions** → **Build driver app APK** → **Run workflow**.
+   It also runs on every push to `main` (or a `claude/mobile-*` branch) that
+   changes `apps/mobile/`.
+2. Open the finished run and download the **achaago-debug-apk** artifact
+   (a zip containing `app-debug.apk`).
+3. Copy `app-debug.apk` to an Android phone and open it. Allow "install
+   unknown apps" when Android asks, then install.
+
+The build points at `http://64.119.31.106:8187` by default. When running
+the workflow by hand you can type a different API and WebSocket address.
+This debug APK is for testing only, not for the Play Store.
 
 ## Checks
 
@@ -135,13 +147,8 @@ flutter analyze
 flutter test
 ```
 
-> **Note on this change's own verification:** this branch was produced in a
-> sandboxed session with outbound network access restricted to GitHub only
-> (no access to `pub.dev` or the Flutter tooling's own artifact host), so
-> `flutter pub get`/`analyze`/`test` could not actually be executed here.
-> The code was written and reviewed carefully (including a full manual
-> cross-check of every cross-file symbol reference) to compile cleanly, but
-> please run the two commands above for real before merging.
+CI (`.github/workflows/mobile-apk.yml`) runs both on every build and fails
+if either reports a problem.
 
 ## Project structure
 

@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.2
-  web_socket_channel: ^2.4.5
+  web_socket_channel: ^3.0.3
   flutter_secure_storage: ^9.2.2
   geolocator: ^13.0.1
   url_launcher: ^6.3.1

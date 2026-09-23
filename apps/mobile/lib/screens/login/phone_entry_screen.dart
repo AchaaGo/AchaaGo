@@ -67,15 +67,15 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
             Container(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
               color: AppColors.ink,
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.local_shipping_outlined, color: AppColors.accent, size: 36),
-                  const SizedBox(height: 16),
+                  Icon(Icons.local_shipping_outlined, color: AppColors.accent, size: 36),
+                  SizedBox(height: 16),
                   Text(
                     Strings.brandTagline,
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.25),
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.25),
                   ),
                 ],
               ),

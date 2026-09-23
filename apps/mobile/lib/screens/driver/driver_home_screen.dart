@@ -221,7 +221,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           child: SwitchListTile(
             value: profile.isOnline,
             onChanged: _busyToggle ? null : _toggleOnline,
-            activeColor: AppColors.ink,
+            activeThumbColor: AppColors.ink,
             title: Text(
               profile.isOnline ? Strings.driverOnline : Strings.driverOffline,
               style: const TextStyle(fontWeight: FontWeight.w700),

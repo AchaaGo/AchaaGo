@@ -23,7 +23,7 @@ class Strings {
   static const otpVerify = 'Баталгаажуулах';
   static const otpResend = 'Код дахин илгээх';
   static String otpResendCountdown(int seconds) => 'Дахин илгээх · $seconds сек';
-  static const otpDevHint = 'Хөгжүүлэлтийн горимд баталгаажуулах код: 0000';
+  static const otpDevHint = 'Хөгжүүлэлтийн горимд баталгаажуулах код: 00';
 
   // Customer home
   static String greeting(String? name) => name == null || name.isEmpty ? 'Сайн байна уу' : 'Сайн байна уу, $name';

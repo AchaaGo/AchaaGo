@@ -63,10 +63,12 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         _loadingServices = false;
       });
     } on ApiException catch (e) {
-      if (mounted) setState(() {
-        _error = e.message;
-        _loadingServices = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _loadingServices = false;
+        });
+      }
     }
   }
 
@@ -128,7 +130,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _serviceId,
+                        initialValue: _serviceId,
                         decoration: const InputDecoration(labelText: Strings.driverServiceLabel),
                         items: _services
                             .map((service) => DropdownMenuItem(value: service.id, child: Text(service.nameMn)))
