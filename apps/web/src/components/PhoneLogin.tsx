@@ -8,6 +8,7 @@ import {customerCopy as copy} from './customerCopy';
 export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<void>;heading?:string}) {
   const [step, setStep] = useState<'phone'|'code'>('phone');
   const [phone, setPhone] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +22,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
   useEffect(() => { if (step === 'code' && !busy) codeInput.current?.focus(); }, [step, busy]);
 
   async function request() {
-    if (busy || phone.length !== 8) return;
+    if (busy || phone.length !== 8 || !acceptedTerms) return;
     setBusy(true); setError('');
     try {
       await api('/auth/otp/request', {method:'POST', body:JSON.stringify({phone:'+976'+phone})});
@@ -66,11 +67,18 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
         <label className="field-label" htmlFor="phone">Утасны дугаар</label>
         <div className="phone-field"><span className="phone-prefix">+976</span><input id="phone" className="field" type="tel" inputMode="numeric" autoComplete="tel-national" value={phoneFmt(phone)} disabled={busy} onChange={e => {setPhone(e.target.value.replace(/\D/g,'').slice(0,8)); setError('');}} placeholder="8888 8888" aria-describedby={error ? 'phone-help auth-error' : 'phone-help'} aria-invalid={!!error}/></div>
         <p id="phone-help" className="field-help">{copy.phoneHelp}</p>
+        <div className="terms-consent">
+          <label className="terms-consent-label" htmlFor="accept-terms">
+            <input id="accept-terms" type="checkbox" required checked={acceptedTerms} disabled={busy} onChange={e => setAcceptedTerms(e.target.checked)} aria-describedby="terms-help"/>
+            <span>{copy.acceptTerms}</span>
+          </label>
+          <a href="/terms" target="_blank" rel="noopener noreferrer">{copy.readTerms}<span className="sr-only"> — {copy.newWindow}</span></a>
+        </div>
+        <p id="terms-help" className="field-help">{acceptedTerms ? copy.termsAccepted : copy.termsRequired}</p>
         {error && <p id="auth-error" className="error" role="alert">{error}</p>}
-        <button className="btn btn-primary" disabled={phone.length !== 8 || busy}>{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.requestCode : 'Үргэлжлүүлэх'}</button>
+        <button className="btn btn-primary" disabled={phone.length !== 8 || !acceptedTerms || busy} aria-describedby="terms-help">{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.requestCode : 'Үргэлжлүүлэх'}</button>
         <span className="sr-only" role="status">{busy ? copy.requestCode : ''}</span>
       </form>
-      <p className="auth-terms muted">Үргэлжлүүлснээр та <a href="/terms">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p>
     </section>
   </main>;
 }
