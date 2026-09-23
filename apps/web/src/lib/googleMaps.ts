@@ -32,7 +32,7 @@ export function loadGoogleMaps(apiKey: string): Promise<GoogleMapsNamespace> {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
     script.async = true;
     script.setAttribute(SCRIPT_ATTR, 'true');
     script.addEventListener('load', onReady, {once: true});
