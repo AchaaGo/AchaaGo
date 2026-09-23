@@ -92,6 +92,19 @@ export function searchGooglePlaces(
 
 export type PlaceDetails = {lat: number; lng: number; address: string};
 
+/** Resolves a map-tapped coordinate to the nearest human-readable address.
+ *  This uses the Maps JavaScript Geocoder and only runs after an explicit
+ *  customer tap. Callers retain their coordinate-only fallback when Google
+ *  cannot return an address. */
+export async function reverseGeocode(point: {lat: number; lng: number}): Promise<string> {
+  const maps = (window as unknown as {google?: {maps?: {Geocoder?: new () => any}}}).google?.maps;
+  if (!maps?.Geocoder) throw new Error('Google geocoder is unavailable');
+  const {results} = await new maps.Geocoder().geocode({location: point});
+  const address = results.find((result: any) => result.formatted_address)?.formatted_address;
+  if (!address) throw new Error('No address found for this point');
+  return address;
+}
+
 /** Only fetched once the user picks a suggestion — never while typing —
  *  and field-masked to the cheapest ("Basic Data") tier: just the
  *  coordinates and a display address, nothing else. */
