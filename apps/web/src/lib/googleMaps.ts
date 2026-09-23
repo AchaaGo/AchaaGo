@@ -76,6 +76,5 @@ export type MapSdkState = 'idle' | 'loading' | 'loaded' | 'error';
  *  test runner (see apps/web's README for the current testing gap). */
 export function shouldShowRealMap(input: {hasApiKey: boolean; sdkState: MapSdkState; locationPermission: LocationPermission}): boolean {
   if (!input.hasApiKey) return false;
-  if (input.locationPermission === 'denied') return false;
   return input.sdkState === 'loaded';
 }
