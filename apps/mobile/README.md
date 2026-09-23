@@ -128,6 +128,31 @@ implemented here, per the task scope.
 flutter run
 ```
 
+### Getting a build without installing Flutter yourself
+
+There's no way to "open a link" and see this app the way you can with
+`apps/web` — it's a native app, not a website, so it has to be installed on
+a phone or emulator. If nobody on the team has the Flutter SDK set up yet,
+`.github/workflows/mobile-apk.yml` builds a debug APK for you automatically:
+
+1. On GitHub, open the **Actions** tab → **Build driver app APK** → **Run workflow**
+   (it also runs automatically whenever `apps/mobile/` changes on `main`).
+2. Wait for the run to finish (a few minutes).
+3. Open the finished run and download the **achaago-driver-debug-apk** artifact
+   under "Artifacts" — it's a zip containing `app-debug.apk`.
+4. Copy `app-debug.apk` to an Android phone (email, cloud drive, USB — any way you like).
+5. On the phone, open the file. Android will ask to allow installing from
+   this source ("install unknown apps") — allow it, then install.
+
+The app will default to talking to `http://10.0.2.2:8187/api`, which only
+resolves from the Android emulator. On a real phone, use a build reachable
+over the network — either `flutter build apk --dart-define=API_BASE_URL=http://<your-server>:8187/api` yourself once you have Flutter installed, or ask
+for the base URL to be made configurable in-app if you need to hand out
+builds regularly without rebuilding each time.
+
+This debug APK is unsigned/dev-only and meant for trying the app out, not
+for the Play Store.
+
 ## Checks
 
 ```bash
