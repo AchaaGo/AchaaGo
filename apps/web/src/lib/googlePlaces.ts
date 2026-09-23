@@ -81,7 +81,7 @@ export function searchGooglePlaces(
     input,
     sessionToken: sessionToken ?? undefined,
     includedRegionCodes: ['mn'],
-    locationBias: {center: UB_CENTER, radius: 60000},
+    locationBias: {center: UB_CENTER, radius: 50000},
     language: 'mn',
   })).then(({suggestions}: {suggestions: any[]}) => suggestions.flatMap(suggestion => {
     const prediction = suggestion.placePrediction;
