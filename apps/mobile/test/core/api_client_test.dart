@@ -17,11 +17,13 @@ void main() {
       final client = ApiClient(
         client: MockClient((request) async {
           expect(request.url.path, endsWith('/services'));
-          return http.Response(
-            jsonEncode([
+          // Like FastAPI: UTF-8 bytes, content-type without a charset.
+          return http.Response.bytes(
+            utf8.encode(jsonEncode([
               {'id': '1', 'code': 'porter', 'name_mn': 'Портер'},
-            ]),
+            ])),
             200,
+            headers: {'content-type': 'application/json'},
           );
         }),
       );
@@ -30,6 +32,7 @@ void main() {
 
       expect(result, isA<List>());
       expect((result as List).single['code'], 'porter');
+      expect(result.single['name_mn'], 'Портер');
     });
 
     test('maps a JSON {detail} error body to a matching ApiException', () async {

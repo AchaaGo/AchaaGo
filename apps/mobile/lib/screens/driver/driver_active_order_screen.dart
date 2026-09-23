@@ -59,7 +59,7 @@ class _DriverActiveOrderScreenState extends State<DriverActiveOrderScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: Text(Strings.driverCustomerLabel),
+                title: const Text(Strings.driverCustomerLabel),
                 subtitle: Text(_order.pickup.address),
               ),
             ),

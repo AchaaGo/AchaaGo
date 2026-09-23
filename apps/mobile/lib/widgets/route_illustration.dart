@@ -26,7 +26,7 @@ class RouteIllustration extends StatelessWidget {
             Container(
               width: 60,
               height: 60,
-              decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.55), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.55), shape: BoxShape.circle),
             ),
           if (showTruck)
             const CircleAvatar(

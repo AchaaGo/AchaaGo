@@ -238,7 +238,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(Strings.chooseVehicle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                const Text(Strings.chooseVehicle, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
                 if (_quote != null)
                   Text('${_quote!.distanceKm.toStringAsFixed(1)} км · ~${_quote!.durationMinutes} мин',
                       style: const TextStyle(color: AppColors.muted)),
@@ -255,7 +255,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               contentPadding: EdgeInsets.zero,
               value: _loaders > 0,
               onChanged: _busy ? null : _toggleLoader,
-              activeColor: AppColors.ink,
+              activeThumbColor: AppColors.ink,
               title: const Text(Strings.addLoader, style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text('+${formatMoney(_quote?.loaderRate ?? 25000)}'),
             ),

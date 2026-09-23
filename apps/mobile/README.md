@@ -147,13 +147,8 @@ flutter analyze
 flutter test
 ```
 
-> **Note on this change's own verification:** this branch was produced in a
-> sandboxed session with outbound network access restricted to GitHub only
-> (no access to `pub.dev` or the Flutter tooling's own artifact host), so
-> `flutter pub get`/`analyze`/`test` could not actually be executed here.
-> The code was written and reviewed carefully (including a full manual
-> cross-check of every cross-file symbol reference) to compile cleanly, but
-> please run the two commands above for real before merging.
+CI (`.github/workflows/mobile-apk.yml`) runs both on every build and fails
+if either reports a problem.
 
 ## Project structure
 
