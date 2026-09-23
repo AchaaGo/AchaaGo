@@ -7,7 +7,7 @@ import {mn} from '@/lib/messages';
 import {GoogleMapView} from './GoogleMapView';
 import {PhoneLogin} from './PhoneLogin';
 
-type PlaceRow = {id:string; address:string; source:'google'|'demo'};
+type PlaceRow = {id:string; address:string; source:'google'|'demo'; place?:unknown};
 
 type Screen='loading'|'login'|'home'|'route'|'finding'|'tracking'|'complete';
 const fallback:Point={lat:47.9186,lng:106.9177,address:'Одоогийн байршил'};
@@ -45,7 +45,7 @@ export function CustomerFlow() {
     else if(e.key==='ArrowUp'){e.preventDefault();setHighlight(h=>cycleHighlight(h,places.length,-1))}
     else if(e.key==='Enter'&&highlight>=0){e.preventDefault();pickPlace(places[highlight])}
   }
-  async function pickPlace(row:PlaceRow){setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);const place=row.source==='google'?await getGooglePlaceDetails(row.id,sessionToken.current):await api<Point>('/places/'+encodeURIComponent(row.id));sessionToken.current=null;setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+  async function pickPlace(row:PlaceRow){setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);const place=row.source==='google'?await getGooglePlaceDetails(row.place):await api<Point>('/places/'+encodeURIComponent(row.id));sessionToken.current=null;setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   async function pickOnMap(point:{lat:number;lng:number}){setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);const place:Point={...point,address:'Газрын зураг дээр сонгосон цэг'};setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   async function requote(nextLoaders:number){setLoaders(nextLoaders);if(!dropoff)return;setBusy(true);try{setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders:nextLoaders})}))}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   async function placeOrder(){if(!dropoff||!quote||!selectedPrice)return;setBusy(true);setError('');try{const value=await api<Order>('/orders',{method:'POST',headers:{'Idempotency-Key':uuid()},body:JSON.stringify({pickup,dropoff,loaders,service_id:selected,payment_method:pay,expected_total:selectedPrice.breakdown.total,quote_token:quote.quote_token})});setOrder(value);setScreen(value.status==='assigned'?'tracking':'finding');watch(value)}catch(e){if((e as ApiError).code==='QUOTE_CHANGED'&&dropoff)setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders})}));setError((e as Error).message)}finally{setBusy(false)}}

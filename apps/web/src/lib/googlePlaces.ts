@@ -1,8 +1,6 @@
-// Wraps the classic Places JavaScript library (AutocompleteService +
-// PlacesService) for the destination search box on the route screen.
-// Requires `libraries=places` in the Maps script URL (see googleMaps.ts)
-// and the "Places API" enabled on the project — see README.md
-// "Google Maps (web)".
+// Wraps the current Places API (New) data API for the destination search
+// box on the route screen. It deliberately does not call the deprecated
+// AutocompleteService or PlacesService classes.
 //
 // The pure functions below (`mapPrediction`, `shouldFallbackToDemo`,
 // `createStaleGuard`, `cycleHighlight`) have no browser/DOM dependency and
@@ -10,7 +8,7 @@
 // apps/web,
 //   node --experimental-strip-types --test src/lib/googlePlaces.test.ts
 
-export type PlaceSuggestion = {id: string; address: string};
+export type PlaceSuggestion = {id: string; address: string; place?: unknown};
 
 /** Turns a raw Places prediction into the same {id,address} shape the
  *  app's demo `/places` search already returns, so the rest of
@@ -60,28 +58,12 @@ function placesLibrary(): typeof google.maps.places | null {
 }
 
 export function isGooglePlacesAvailable(): boolean {
-  return placesLibrary() !== null;
-}
-
-let autocompleteService: google.maps.places.AutocompleteService | null = null;
-let placesService: google.maps.places.PlacesService | null = null;
-
-function getAutocompleteService(): google.maps.places.AutocompleteService | null {
-  const places = placesLibrary();
-  if (!places) return null;
-  if (!autocompleteService) autocompleteService = new places.AutocompleteService();
-  return autocompleteService;
-}
-
-function getPlacesService(): google.maps.places.PlacesService | null {
-  const places = placesLibrary();
-  if (!places) return null;
-  if (!placesService) placesService = new places.PlacesService(document.createElement('div'));
-  return placesService;
+  const maps = (window as unknown as {google?: {maps?: {importLibrary?: unknown}}}).google?.maps;
+  return typeof maps?.importLibrary === 'function';
 }
 
 /** One token per typing session (created on the first keystroke, reused
- *  across every prediction call, spent on the Place Details call) so
+ *  across every prediction call, then spent by Place.fetchFields()) so
  *  Google bills the whole search-then-select sequence as a single
  *  session instead of N separate autocomplete requests. */
 export function createSessionToken(): google.maps.places.AutocompleteSessionToken | null {
@@ -93,32 +75,20 @@ export function searchGooglePlaces(
   input: string,
   sessionToken: google.maps.places.AutocompleteSessionToken | null,
 ): Promise<PlaceSuggestion[]> {
-  return new Promise((resolve, reject) => {
-    const service = getAutocompleteService();
-    if (!service) {
-      reject(new Error('Places library not loaded'));
-      return;
-    }
-    service.getPlacePredictions(
-      {
-        input,
-        sessionToken: sessionToken ?? undefined,
-        componentRestrictions: {country: 'mn'},
-        locationBias: {center: UB_CENTER, radius: 60000},
-      },
-      (predictions, status) => {
-        if (status === 'ZERO_RESULTS') {
-          resolve([]);
-          return;
-        }
-        if (shouldFallbackToDemo(status) || !predictions) {
-          reject(new Error(`Places autocomplete failed: ${status}`));
-          return;
-        }
-        resolve(predictions.map(mapPrediction));
-      },
-    );
-  });
+  const maps = (window as unknown as {google?: {maps?: {importLibrary?: (name: string) => Promise<unknown>}}}).google?.maps;
+  if (!maps?.importLibrary) return Promise.reject(new Error('Places API (New) library not loaded'));
+  return maps.importLibrary('places').then((library: any) => library.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+    input,
+    sessionToken: sessionToken ?? undefined,
+    includedRegionCodes: ['mn'],
+    locationBias: {center: UB_CENTER, radius: 60000},
+    language: 'mn',
+  })).then(({suggestions}: {suggestions: any[]}) => suggestions.flatMap(suggestion => {
+    const prediction = suggestion.placePrediction;
+    if (!prediction) return [];
+    const place = prediction.toPlace();
+    return [{id: place.id, address: prediction.text.toString(), place}];
+  }));
 }
 
 export type PlaceDetails = {lat: number; lng: number; address: string};
@@ -127,28 +97,16 @@ export type PlaceDetails = {lat: number; lng: number; address: string};
  *  and field-masked to the cheapest ("Basic Data") tier: just the
  *  coordinates and a display address, nothing else. */
 export function getGooglePlaceDetails(
-  placeId: string,
-  sessionToken: google.maps.places.AutocompleteSessionToken | null,
+  selectedPlace: unknown,
 ): Promise<PlaceDetails> {
-  return new Promise((resolve, reject) => {
-    const service = getPlacesService();
-    if (!service) {
-      reject(new Error('Places library not loaded'));
-      return;
-    }
-    service.getDetails(
-      {placeId, sessionToken: sessionToken ?? undefined, fields: ['geometry', 'formatted_address']},
-      (place, status) => {
-        if (shouldFallbackToDemo(status) || !place?.geometry?.location) {
-          reject(new Error(`Place details failed: ${status}`));
-          return;
-        }
-        resolve({
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          address: place.formatted_address ?? '',
-        });
-      },
-    );
+  const place = selectedPlace as any;
+  if (!place?.fetchFields) return Promise.reject(new Error('Selected place is unavailable'));
+  return place.fetchFields({fields: ['location', 'formattedAddress']}).then(() => {
+    if (!place.location) throw new Error('Selected place has no location');
+    return {
+      lat: place.location.lat(),
+      lng: place.location.lng(),
+      address: place.formattedAddress ?? '',
+    };
   });
 }
