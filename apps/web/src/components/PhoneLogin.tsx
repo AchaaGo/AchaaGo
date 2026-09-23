@@ -65,14 +65,12 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
       <div><h2>Утасны дугаараа оруулна уу</h2><p className="muted">{copy.phoneIntro}</p></div>
       <form className="auth-form" onSubmit={e => {e.preventDefault(); void request();}} aria-busy={busy}>
         <label className="field-label" htmlFor="phone">Утасны дугаар</label>
-        <div className="phone-field"><span className="phone-prefix">+976</span><input id="phone" className="field" type="tel" inputMode="numeric" autoComplete="tel-national" value={phoneFmt(phone)} disabled={busy} onChange={e => {setPhone(e.target.value.replace(/\D/g,'').slice(0,8)); setError('');}} placeholder="8888 8888" aria-describedby={error ? 'phone-help auth-error' : 'phone-help'} aria-invalid={!!error}/></div>
-        <p id="phone-help" className="field-help">{copy.phoneHelp}</p>
+        <div className="phone-field"><span className="phone-prefix">+976</span><input id="phone" className="field" type="tel" inputMode="numeric" autoComplete="tel-national" value={phoneFmt(phone)} disabled={busy} onChange={e => {setPhone(e.target.value.replace(/\D/g,'').slice(0,8)); setError('');}} placeholder="8888 8888" aria-describedby={error ? 'auth-error' : undefined} aria-invalid={!!error}/></div>
         <div className="terms-consent">
           <label className="terms-consent-label" htmlFor="accept-terms">
             <input id="accept-terms" type="checkbox" required checked={acceptedTerms} disabled={busy} onChange={e => setAcceptedTerms(e.target.checked)} aria-describedby="terms-help"/>
-            <span>{copy.acceptTerms}</span>
+            <span><span className="terms-consent-text">{copy.acceptTerms}</span><a href="/terms" target="_blank" rel="noopener noreferrer">{copy.readTerms}<span className="sr-only"> — {copy.newWindow}</span></a></span>
           </label>
-          <a href="/terms" target="_blank" rel="noopener noreferrer">{copy.readTerms}<span className="sr-only"> — {copy.newWindow}</span></a>
         </div>
         <p id="terms-help" className="field-help">{acceptedTerms ? copy.termsAccepted : copy.termsRequired}</p>
         {error && <p id="auth-error" className="error" role="alert">{error}</p>}
