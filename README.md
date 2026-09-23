@@ -26,16 +26,24 @@ All customer-visible strings are Mongolian. Undecided product values remain conf
 ## Google Maps (web)
 
 The customer web app shows a real interactive Google Map (pickup/drop-off
-markers, tap-to-choose on the route screen) once a browser API key is
-configured. Without one, it falls back to the same decorative map it always
-had — nothing else in the app changes either way.
+markers, tap-to-choose on the route screen) and a real destination
+autocomplete search ("Хаашаа очих вэ?" on the route screen) once a browser
+API key is configured. Without one — or if Places API isn't enabled, or the
+Places request fails for any reason (offline, quota, ...) — the search box
+falls back to the existing `/places` demo search, and the map falls back to
+the decorative illustration it always had. Nothing else in the app changes
+either way.
 
 ### Create and restrict a key
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), pick or
-   create a project, then **APIs & Services → Library** and enable
-   **Maps JavaScript API** only (the web app doesn't call Places,
-   Directions, or Geocoding — no need to enable or pay for those).
+   create a project, then **APIs & Services → Library** and enable **both**:
+   - **Maps JavaScript API** — renders the map itself.
+   - **Places API** — powers the destination autocomplete suggestions and
+     resolving a selected suggestion's coordinates. The web app only calls
+     Autocomplete + Place Details (field-masked to just location/address);
+     it never calls Directions or Geocoding — no need to enable or pay for
+     those.
 2. **APIs & Services → Credentials → Create Credentials → API key.**
 3. Click the new key to edit it, then under **Application restrictions**
    choose **Websites** and add the HTTP referrers that should be allowed to
@@ -44,8 +52,8 @@ had — nothing else in the app changes either way.
    - `http://64.119.31.106:8187/*` — temporary, for testing against this
      environment's IP; remove it once a real domain is in place
    - `http://localhost:8187/*` and `http://127.0.0.1:8187/*` for local dev
-4. Under **API restrictions**, restrict the key to **Maps JavaScript API**
-   only.
+4. Under **API restrictions**, restrict the key to exactly **Maps
+   JavaScript API** and **Places API** — nothing else.
 5. Copy the key into `.env` as `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...` (leave
    `GOOGLE_MAPS_API_KEY` — the separate server-side key used by
    `services/api`'s optional Google-backed place search/routing — alone
@@ -55,6 +63,15 @@ had — nothing else in the app changes either way.
    ```bash
    docker compose up --build -d web
    ```
+
+**Cost control for Places:** the destination search debounces input, waits
+for 3+ characters, and only fetches full place details (never full contact
+or atmosphere data — just coordinates and an address) after the customer
+picks a suggestion. It also uses one Places "session token" per search —
+reused across every keystroke's suggestions and spent on the final details
+call — so Google bills a whole search-then-select sequence as one session
+rather than per keystroke. See "how to know when you'll be charged" in the
+Cloud Console: **Billing → Budgets & alerts** to set a spending tripwire.
 
 **Never commit a real key.** `.env` is git-ignored; only `.env.example`
 (with empty values) is committed. This key is restricted by HTTP referrer,
