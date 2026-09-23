@@ -29,11 +29,9 @@ class AppConfig {
     defaultValue: 'AchaaGo',
   );
 
-  /// The backend only ever accepts this code while SMS_PROVIDER=console
-  /// (development). See services/api/app/main.py `otp_verify`. The OTP
-  /// field is validated server-side as exactly 4 digits, so the working
-  /// development code is "0000", not "00".
-  static const String devOtpCode = '0000';
+  /// Accepted by the backend only while SMS_PROVIDER=console
+  /// (services/api/app/main.py `otp_verify`). Real SMS codes are 4 digits.
+  static const String devOtpCode = '00';
 
   static const Duration requestTimeout = Duration(seconds: 15);
 

@@ -11,7 +11,7 @@ both customers who prefer an app and, per `AGENTS.md`, drivers.
 ## What's implemented
 
 **Customer**
-- Phone-number login, 4-digit code verification (`0000` in development — see below)
+- Phone-number login, 4-digit code verification (`00` shortcut in development — see below)
 - Service selection (Амжиргаа / Портер, loaded from `GET /services`)
 - Pickup (device location) and drop-off address entry with search
 - Loader count, live server-priced quote, cash/QPay selection
@@ -50,16 +50,19 @@ This directory ships the Dart application (`lib/`, `test/`, `pubspec.yaml`)
 but **not** the generated native platform projects (`android/`, `ios/`):
 those are toolchain-specific (Gradle/AGP/Kotlin, Xcode) and are best
 generated fresh by the Flutter CLI you actually have installed, rather than
-committed and risking a mismatch. Generate them once:
+committed and risking a mismatch. Generate them once (also adds the location permissions and the app name
+to the Android manifest):
 
 ```bash
 cd apps/mobile
-flutter create --platforms=android,ios --org mn.achaago .
+./tool/prepare_android.sh
 flutter pub get
 ```
 
-`flutter create` on an existing project only adds the missing platform
-folders — it will not overwrite `lib/`, `test/`, or `pubspec.yaml`.
+The script runs `flutter create --platforms=android`, which only adds the
+missing platform folder — it will not overwrite `lib/`, `test/`, or
+`pubspec.yaml`. For iOS, run `flutter create --platforms=ios --org mn.achaago .`
+and add the `Info.plist` entry below by hand.
 
 Android is the priority target (`AGENTS.md`: "Android first, iOS later"),
 so that's what has been exercised while writing this app; the iOS project
@@ -69,19 +72,15 @@ here.
 ### Location permission
 
 The customer (pickup location) and driver (online location updates) flows
-use the `geolocator` plugin, which needs a permission entry once the
-platform projects exist:
+use the `geolocator` plugin. `tool/prepare_android.sh` adds the Android
+permissions. It also sets `android:usesCleartextTraffic="true"`, because the
+current server is plain `http://`; remove that once the server has HTTPS.
+iOS needs this in `ios/Runner/Info.plist`:
 
-- **Android** (`android/app/src/main/AndroidManifest.xml`), inside `<manifest>`:
-  ```xml
-  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-  ```
-- **iOS** (`ios/Runner/Info.plist`):
-  ```xml
-  <key>NSLocationWhenInUseUsageDescription</key>
-  <string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>
-  ```
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>
+```
 
 The app works without granting the permission — it falls back to a fixed
 Ulaanbaatar-center pickup point for customers, and asks the driver to grant
@@ -113,14 +112,10 @@ unlike the Android emulator it shares the host's network namespace.)
 
 ## Development OTP code
 
-The backend's console SMS provider prints the real OTP to the API/worker
-logs, **and** accepts a fixed development code regardless of what was
-generated (`services/api/app/main.py otp_verify`, gated on
-`SMS_PROVIDER=console`, which is the default in `.env.example`). That code
-is **`0000`** (four digits) — the OTP field is validated as exactly 4
-digits server-side, so `00` is not a valid request body. The verification
-screen shows this hint under the code field. No real SMS is sent or
-implemented here, per the task scope.
+While the backend runs with `SMS_PROVIDER=console`, it prints the real
+4-digit code to the API/worker logs and also accepts the shortcut code
+**`00`** (`services/api/app/main.py otp_verify`). The verification screen
+shows this hint under the code field.
 
 ## Running
 
@@ -130,28 +125,20 @@ flutter run
 
 ### Getting a build without installing Flutter yourself
 
-There's no way to "open a link" and see this app the way you can with
-`apps/web` — it's a native app, not a website, so it has to be installed on
-a phone or emulator. If nobody on the team has the Flutter SDK set up yet,
-`.github/workflows/mobile-apk.yml` builds a debug APK for you automatically:
+This is a native app, not a website, so it has to be installed on a phone.
+`.github/workflows/mobile-apk.yml` builds a debug APK on GitHub:
 
-1. On GitHub, open the **Actions** tab → **Build driver app APK** → **Run workflow**
-   (it also runs automatically whenever `apps/mobile/` changes on `main`).
-2. Wait for the run to finish (a few minutes).
-3. Open the finished run and download the **achaago-driver-debug-apk** artifact
-   under "Artifacts" — it's a zip containing `app-debug.apk`.
-4. Copy `app-debug.apk` to an Android phone (email, cloud drive, USB — any way you like).
-5. On the phone, open the file. Android will ask to allow installing from
-   this source ("install unknown apps") — allow it, then install.
+1. On GitHub, open **Actions** → **Build driver app APK** → **Run workflow**.
+   It also runs on every push to `main` (or a `claude/mobile-*` branch) that
+   changes `apps/mobile/`.
+2. Open the finished run and download the **achaago-debug-apk** artifact
+   (a zip containing `app-debug.apk`).
+3. Copy `app-debug.apk` to an Android phone and open it. Allow "install
+   unknown apps" when Android asks, then install.
 
-The app will default to talking to `http://10.0.2.2:8187/api`, which only
-resolves from the Android emulator. On a real phone, use a build reachable
-over the network — either `flutter build apk --dart-define=API_BASE_URL=http://<your-server>:8187/api` yourself once you have Flutter installed, or ask
-for the base URL to be made configurable in-app if you need to hand out
-builds regularly without rebuilding each time.
-
-This debug APK is unsigned/dev-only and meant for trying the app out, not
-for the Play Store.
+The build points at `http://64.119.31.106:8187` by default. When running
+the workflow by hand you can type a different API and WebSocket address.
+This debug APK is for testing only, not for the Play Store.
 
 ## Checks
 

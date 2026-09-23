@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../config/app_config.dart';
 import '../../core/api_exception.dart';
 import '../../core/formatting.dart';
 import '../../l10n/strings.dart';
@@ -13,7 +14,7 @@ import '../shared/role_gate_screen.dart';
 
 /// Screen 2 in AGENTS.md. The backend only accepts a real SMS code in
 /// production; in this development build (SMS_PROVIDER=console) the
-/// working code is always "0000" (see AppConfig.devOtpCode).
+/// working shortcut code is AppConfig.devOtpCode.
 class OtpVerifyScreen extends StatefulWidget {
   const OtpVerifyScreen({super.key, required this.localPhone});
 
@@ -124,7 +125,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 textAlign: TextAlign.center,
                 maxLength: 4,
                 style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: 18),
-                decoration: const InputDecoration(counterText: '', hintText: '0000'),
+                decoration: const InputDecoration(counterText: '', hintText: '····'),
                 onChanged: _onCodeChanged,
               ),
               const Padding(
@@ -141,7 +142,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              PrimaryButton(label: Strings.otpVerify, busy: _busy, onPressed: _code.length == 4 ? _verify : null),
+              PrimaryButton(label: Strings.otpVerify, busy: _busy, onPressed: _code.length == 4 || _code == AppConfig.devOtpCode ? _verify : null),
             ],
           ),
         ),

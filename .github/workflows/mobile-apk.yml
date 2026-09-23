@@ -1,10 +1,17 @@
 name: Build driver app APK
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: REST API address the app talks to
+        default: http://64.119.31.106:8187/api
+      ws_base_url:
+        description: WebSocket address for live tracking
+        default: ws://64.119.31.106:8187
   push:
-    branches: [main]
-    paths: ['apps/mobile/**']
+    branches: [main, 'claude/mobile-**']
+    paths: ['apps/mobile/**', '.github/workflows/mobile-apk.yml']
 
 jobs:
   build:
@@ -12,6 +19,9 @@ jobs:
     defaults:
       run:
         working-directory: apps/mobile
+    env:
+      API_BASE_URL: ${{ inputs.api_base_url || 'http://64.119.31.106:8187/api' }}
+      WS_BASE_URL: ${{ inputs.ws_base_url || 'ws://64.119.31.106:8187' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,24 +29,24 @@ jobs:
         with:
           channel: stable
 
-      - name: Generate native Android project
-        run: flutter create --platforms=android --org mn.achaago .
+      - name: Generate Android project
+        run: ./tool/prepare_android.sh
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze (report only, does not block the build)
+      - name: Analyze (report only)
         run: flutter analyze || true
 
-      - name: Run tests (report only, does not block the build)
+      - name: Run tests (report only)
         run: flutter test || true
 
       - name: Build debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=API_BASE_URL="$API_BASE_URL" --dart-define=WS_BASE_URL="$WS_BASE_URL"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: achaago-driver-debug-apk
+          name: achaago-debug-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 14
