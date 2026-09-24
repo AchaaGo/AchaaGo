@@ -176,3 +176,42 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 @media (hover:hover) { .btn-primary:hover:not(:disabled), .btn-accent:hover:not(:disabled) { background:var(--accent-hover); } }
 .service-icon { background:var(--ink-deep); color:var(--mint); }
 .terms-consent a { color:var(--accent-hover); }
+
+/* Booking polish is limited to mobile viewports; desktop keeps its existing UI. */
+.mobile-vehicle-selector, .booking-addresses, .booking-handle { display:none; }
+@media (max-width:767px) {
+  .customer-screen .desktop-vehicle-selector { display:none; }
+  .customer-screen .booking-sheet { padding:12px 16px calc(24px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; box-shadow:0 -3px 12px #183d3008; }
+  .booking-handle { display:block; width:36px; height:4px; border-radius:4px; background:var(--line); margin:0 auto 20px; }
+  .booking-addresses { display:grid; gap:18px; margin:0 0 24px; }
+  .booking-stop { position:relative; min-width:0; padding-left:24px; }
+  .booking-stop::before { content:""; position:absolute; width:10px; height:10px; border-radius:50%; left:0; top:5px; background:var(--ink-deep); }
+  .pickup-stop::after { content:""; position:absolute; top:19px; bottom:-17px; left:4px; width:1px; background:var(--line); }
+  .destination-stop::before { background:var(--accent); }
+  .booking-stop dt { font-size:12px; font-weight:600; color:var(--muted); }
+  .booking-stop dd { margin:3px 0 0; font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
+  .mobile-vehicle-selector { display:grid; gap:10px; }
+  .vehicle-card { position:relative; width:100%; min-width:0; min-height:112px; padding:14px 12px; display:grid; grid-template-columns:68px minmax(0,1fr); align-items:center; gap:10px; border:1px solid var(--line); border-radius:16px; background:var(--surface); text-align:left; cursor:pointer; }
+  .vehicle-card[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+  .vehicle-card:disabled { cursor:wait; }
+  .vehicle-art { display:block; width:100%; }
+  .vehicle-art svg { display:block; width:100%; height:auto; }
+  .vehicle-body { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 6px; align-items:start; }
+  .vehicle-title { grid-column:1; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; min-width:0; }
+  .vehicle-title strong { font-size:15px; line-height:1.45; overflow-wrap:anywhere; }
+  .vehicle-badge { display:inline-block; font-size:10px; line-height:1.5; font-weight:600; color:var(--ink-deep); background:var(--mint); border-radius:5px; padding:2px 5px; }
+  .vehicle-description, .vehicle-hint { grid-column:1 / -1; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+  .vehicle-description { color:var(--ink); }
+  .vehicle-hint { color:var(--muted); padding-right:22px; }
+  .vehicle-price { grid-column:2; grid-row:1; font-size:14px; font-weight:700; text-align:right; max-width:100px; overflow-wrap:anywhere; }
+  .vehicle-check { position:absolute; right:12px; bottom:12px; display:grid; place-items:center; width:18px; height:18px; border-radius:50%; border:1px solid var(--line); background:white; color:var(--ink-deep); }
+  .vehicle-card[aria-pressed="true"] .vehicle-check { border-color:var(--ink-deep); background:var(--ink-deep); color:white; }
+  .vehicle-card:not([aria-pressed]) .vehicle-price, .vehicle-card:disabled .vehicle-price { font-size:11px; font-weight:500; color:var(--muted); }
+  .booking-sheet .section-heading { margin-bottom:14px; }
+  .booking-sheet .loader-option { margin:14px 0; }
+  .booking-sheet .payment-options { margin-bottom:20px; }
+}
+@media (max-width:359px) {
+  .vehicle-card { grid-template-columns:50px minmax(0,1fr); gap:8px; padding:12px 10px; }
+  .vehicle-title strong, .vehicle-price { font-size:14px; }
+}

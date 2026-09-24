@@ -7,6 +7,7 @@ import {mn} from '@/lib/messages';
 import {GoogleMapView} from './GoogleMapView';
 import {PhoneLogin} from './PhoneLogin';
 import {QpayDialog} from './QpayDialog';
+import {VehicleCards} from './VehicleCards';
 import {customerCopy as copy} from './customerCopy';
 
 type PlaceRow = {id:string; address:string; source:'google'|'demo'; place?:unknown};
@@ -63,7 +64,7 @@ export function CustomerFlow() {
   }
   async function pickPlace(row:PlaceRow){if(busy)return;if(searchTimer.current)clearTimeout(searchTimer.current);setSearched(false);setQuote(null);setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);const place=row.source==='google'?await getGooglePlaceDetails(row.place):await api<Point>('/places/'+encodeURIComponent(row.id));sessionToken.current=null;setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError(customerError(e))}finally{setBusy(false)}}
   async function pickOnMap(point:{lat:number;lng:number}){if(busy)return;if(searchTimer.current)clearTimeout(searchTimer.current);setSearched(false);setQuote(null);setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);let address='Газрын зураг дээр сонгосон цэг';try{address=await reverseGeocode(point)}catch{}const place:Point={...point,address};setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError(customerError(e))}finally{setBusy(false)}}
-  async function requote(nextLoaders:number){if(busy)return;setLoaders(nextLoaders);if(!dropoff)return;setError('');setBusy(true);try{setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders:nextLoaders})}))}catch(e){setError(customerError(e))}finally{setBusy(false)}}
+  async function requote(nextLoaders:number){if(busy)return;setLoaders(nextLoaders);if(!dropoff)return;setError('');setBusy(true);try{setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders:nextLoaders})}))}catch(e){setQuote(null);setError(customerError(e))}finally{setBusy(false)}}
   async function placeOrder(){if(busy||!dropoff||!quote||!selectedPrice)return;setOrdering(true);setBusy(true);setError('');try{const value=await api<Order>('/orders',{method:'POST',headers:{'Idempotency-Key':uuid()},body:JSON.stringify({pickup,dropoff,loaders,service_id:selected,payment_method:pay,expected_total:selectedPrice.breakdown.total,quote_token:quote.quote_token})});setOrder(value);setScreen(value.status==='assigned'?'tracking':'finding');watch(value)}catch(e){if((e as ApiError).code==='QUOTE_CHANGED'&&dropoff)setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders})}));setError(customerError(e))}finally{setBusy(false);setOrdering(false)}}
   function watch(value:Order){orderDone.current=false;setDisconnected(false);if(reconnectTimer.current){clearTimeout(reconnectTimer.current);reconnectTimer.current=null}socket.current?.close();connectOrderSocket(value.id)}
   function connectOrderSocket(orderId:string){
@@ -83,12 +84,14 @@ export function CustomerFlow() {
 
   if(screen==='home')return <main className="phone customer-screen">
     <div className="map-stage home-map"><GoogleMapView pickup={pickup}/><div className="map-toolbar"><button className="icon-btn" aria-label="Цэс"><Menu aria-hidden="true"/></button><button className="icon-btn" aria-label="Профайл"><UserRound aria-hidden="true"/></button></div></div>
-    <section className="sheet" aria-labelledby="home-title">
+    <section className="sheet booking-sheet" aria-labelledby="home-title">
+      <div className="booking-handle" aria-hidden="true"/>
       <span className="muted">Сайн байна уу{user?.name?`, ${user.name}`:''}</span>
       <h1 id="home-title" className="display">Юу ачуулах вэ?</h1>
       {notice&&<p className="status-card" role="status">{notice}</p>}
       <button className="btn home-search" disabled={!services.length} onClick={()=>begin(services.find(s=>s.code==='porter')?.id)}><Search size={20} aria-hidden="true"/>Хаашаа ачих вэ?<ChevronRight size={18} aria-hidden="true" style={{marginLeft:'auto'}}/></button>
-      <div className="service-grid">{services.map(s=><button className="service-card" key={s.id} onClick={()=>begin(s.id)}><span className="service-icon" aria-hidden="true"><ServiceIcon type={s.icon}/></span><strong className="display">{s.name_mn}</strong><small className="muted">{s.description_mn}</small><b className="service-price">{copy.basePrice} {money(s.base_fare)}</b></button>)}</div>
+      <div className="service-grid desktop-vehicle-selector">{services.map(s=><button className="service-card" key={s.id} onClick={()=>begin(s.id)}><span className="service-icon" aria-hidden="true"><ServiceIcon type={s.icon}/></span><strong className="display">{s.name_mn}</strong><small className="muted">{s.description_mn}</small><b className="service-price">{copy.basePrice} {money(s.base_fare)}</b></button>)}</div>
+      <VehicleCards services={services} onSelect={begin} home/>
       {!services.length&&<div className="status-card" role="status"><p>{copy.noServices}</p><button className="btn btn-outline" onClick={boot}>{copy.retry}</button></div>}
     </section>
   </main>;
@@ -102,10 +105,16 @@ export function CustomerFlow() {
       {places.length>0&&<div id="destination-listbox" role="listbox" aria-label="Хүргэх хаягийн санал" className="suggest-list">{places.map((p,index)=><button className="suggest-option" key={p.id} id={`place-option-${index}`} role="option" aria-selected={index===highlight} disabled={busy} onMouseEnter={()=>setHighlight(index)} onClick={()=>pickPlace(p)}><MapPin size={18} aria-hidden="true"/><span>{p.address}</span></button>)}</div>}
     </section>
     <div className="map-stage"><GoogleMapView route={!!dropoff} pickup={pickup} dropoff={dropoff} onPick={pickOnMap}/></div>
-    <section className="sheet" aria-labelledby="service-title">
-      {dropoff&&<div className="selected-address"><MapPin size={19} aria-hidden="true"/><div><small>{copy.selectedAddress}</small><strong>{dropoff.address}</strong></div></div>}
+    <section className="sheet booking-sheet" aria-labelledby="service-title">
+      <div className="booking-handle" aria-hidden="true"/>
+      <dl className="booking-addresses">
+        <div className="booking-stop pickup-stop"><dt>{copy.pickupLabel}</dt><dd>{pickup.address}</dd></div>
+        <div className="booking-stop destination-stop"><dt>{copy.destinationLabel}</dt><dd>{dropoff?.address??copy.destinationPending}</dd></div>
+      </dl>
+      {dropoff&&<div className="selected-address desktop-vehicle-selector"><MapPin size={19} aria-hidden="true"/><div><small>{copy.selectedAddress}</small><strong>{dropoff.address}</strong></div></div>}
       <div className="section-heading"><h2 id="service-title" className="display">Машинаа сонго</h2>{quote&&<span className="muted">{quote.distance_km} км · ~{quote.duration_minutes} мин</span>}</div>
-      <div className="service-options">{(quote?.prices||services.map(service=>({service,breakdown:{total:service.base_fare}}))).map(p=><button className="service-option" key={p.service.id} disabled={busy} onClick={()=>setSelected(p.service.id)} aria-pressed={selected===p.service.id}><span className="service-icon" aria-hidden="true"><ServiceIcon type={p.service.icon}/></span><span className="service-description"><b>{p.service.name_mn}</b><small>{p.service.description_mn}</small></span><span className="service-amount">{!quote&&<small>{copy.basePrice}</small>}<b>{money(p.breakdown.total)}</b></span></button>)}</div>
+      <div className="service-options desktop-vehicle-selector">{(quote?.prices||services.map(service=>({service,breakdown:{total:service.base_fare}}))).map(p=><button className="service-option" key={p.service.id} disabled={busy} onClick={()=>setSelected(p.service.id)} aria-pressed={selected===p.service.id}><span className="service-icon" aria-hidden="true"><ServiceIcon type={p.service.icon}/></span><span className="service-description"><b>{p.service.name_mn}</b><small>{p.service.description_mn}</small></span><span className="service-amount">{!quote&&<small>{copy.basePrice}</small>}<b>{money(p.breakdown.total)}</b></span></button>)}</div>
+      <VehicleCards services={services} quote={quote} selected={selected} busy={busy} onSelect={setSelected}/>
       <label className="loader-option"><span><b>Ачигч нэмэх</b><small>+{money(quote?.loader_rate??25000)}</small></span><input type="checkbox" checked={loaders>0} disabled={busy} onChange={e=>requote(e.target.checked?1:0)}/></label>
       <fieldset className="payment-options" disabled={busy}><legend>{copy.payment}</legend><div>{([['qpay','QPay'],['cash','Бэлэн мөнгө']] as const).map(([id,label])=><button key={id} className="btn" aria-pressed={pay===id} onClick={()=>setPay(id)}>{label}</button>)}</div></fieldset>
       <div className="order-action">

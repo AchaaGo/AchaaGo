@@ -1,5 +1,17 @@
 // Customer presentation strings. Keep transport and Maps helpers unchanged.
 export const customerCopy = {
+  chooseVehicle: 'Тээврийн хэрэгслээ сонго',
+  express: 'Шуурхай',
+  priceAfterRoute: 'Хаяг сонгоход үнэ гарна',
+  priceUpdating: 'Үнэ тооцоолж байна…',
+  pickupLabel: 'Авах газар',
+  destinationLabel: 'Хүргэх газар',
+  destinationPending: 'Хүргэх хаягаа сонгоно уу',
+  vehicleDetails: {
+    motorcycle: {description: 'Жижиг ачаа · Шуурхай хүргэлт', hint: 'Жижиг хайрцаг, бичиг баримт'},
+    amjirgaa: {description: 'Бага, дунд хэмжээний ачаа', hint: 'Хайрцаг, хувцас, жижиг эд зүйлс'},
+    porter: {description: 'Том ачаа · Нүүлгэлт', hint: '1 тонн хүртэл'},
+  },
   loading: 'Түр хүлээнэ үү…',
   retry: 'Дахин оролдох',
   requestCode: 'Код илгээж байна…',
