@@ -168,16 +168,43 @@ test/            Unit tests (formatting, error mapping, API client, model
                  parsing) and widget tests (buttons, star rating, phone entry)
 ```
 
+## Google Maps setup
+
+`lib/widgets/live_map_view.dart` uses `google_maps_flutter`, shown on the
+route, tracking, finding-driver, public-tracking, and driver active-order
+screens (pickup/drop-off markers, a straight line between them — no
+Directions API, same scope as the web app's map — and the driver's own
+live position via the OS location layer).
+
+**This needs its own API key — you cannot reuse the website's key.** A
+Google Cloud key is restricted either to "Websites" (checks the page's
+URL) or to "Android apps" (checks the app's package name + signing
+fingerprint), never both. Create a second key for this app:
+
+1. Google Cloud Console → **APIs & Services → Library** → enable
+   **"Maps SDK for Android"** (a different listing from the website's
+   "Maps JavaScript API").
+2. **Credentials → Create Credentials → API key.**
+3. Edit the new key → **Application restrictions → Android apps** → add
+   package name `mn.achaago.achaago_mobile` and the SHA-1 fingerprint of
+   `apps/mobile/ci/debug.keystore` (a fixed, non-secret debug keystore
+   committed to this repo so every build has the same fingerprint —
+   `keytool -list -v -keystore apps/mobile/ci/debug.keystore -storepass android -alias androiddebugkey`
+   prints it).
+4. **API restrictions** → restrict to just "Maps SDK for Android".
+5. Add the key as a GitHub repository secret named
+   `GOOGLE_MAPS_API_KEY_ANDROID` (Settings → Secrets and variables →
+   Actions) — never commit it or paste it into `.env`. `mobile-apk.yml`
+   reads it from there and `tool/prepare_android.sh` writes it into the
+   generated manifest.
+
+Running locally: `flutter run --dart-define=API_BASE_URL=...` doesn't
+reach the manifest, so export `GOOGLE_MAPS_API_KEY_ANDROID` before
+`./tool/prepare_android.sh` instead. Without a key, the map still
+renders — Android's Maps SDK shows blank tiles rather than failing.
+
 ## Design notes / deliberate limitations
 
-- **No map SDK.** `MAPS_PROVIDER` defaults to the backend's demo provider
-  (a handful of hardcoded Ulaanbaatar landmarks, no real routing), and no
-  Google Maps API key exists in this environment. Screens that show a map
-  in the web app use a small decorative illustration
-  (`lib/widgets/route_illustration.dart`) instead of a real map, matching
-  the task's "don't implement real Google Maps unless it already exists."
-  Swapping in `google_maps_flutter` later is a client-only change once
-  `MAPS_PROVIDER=google` and a key exist.
 - **QPay** renders whatever `POST /orders/{id}/qpay-invoice` returns (the
   demo notice today; a QR image or payment links once QPay is configured
   for real) rather than embedding a QPay SDK.

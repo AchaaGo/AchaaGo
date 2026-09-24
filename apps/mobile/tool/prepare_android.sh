@@ -19,3 +19,20 @@ if ! grep -q ACCESS_FINE_LOCATION "$manifest"; then
   perl -0pi -e 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application android:usesCleartextTraffic="true"#' "$manifest"
 fi
 perl -pi -e 's#android:label="[^"]*"#android:label="AchaaGo"#' "$manifest"
+
+# google_maps_flutter reads its key from this manifest meta-data at runtime.
+# Empty is fine (the map just shows blank tiles) so local setup without a key still works.
+# The key comes from Perl's $ENV, not shell interpolation: this whole -e
+# argument is single-quoted, so a bash "$VAR" here would never expand — it'd
+# write that literal text into the manifest instead of the real key.
+if ! grep -q com.google.android.geo.API_KEY "$manifest"; then
+  perl -0pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_ANDROID} // ""; s#</application>#    <meta-data android:name="com.google.android.geo.API_KEY" android:value="$key"/>\n    </application>#' "$manifest"
+fi
+
+# A fixed debug-signing keystore (its password is the public Android default,
+# "android" — never a secret) so the app's SHA-1 fingerprint is the same on
+# every machine and CI run. Without this, each fresh checkout/runner would
+# get its own random debug key, and a Maps API key restricted to "Android
+# apps" would only ever match one of them.
+mkdir -p "$HOME/.android"
+cp ci/debug.keystore "$HOME/.android/debug.keystore"

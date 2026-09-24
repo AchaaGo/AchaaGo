@@ -13,9 +13,9 @@ import '../../state/app_scope.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/live_map_view.dart';
 import '../../widgets/map_sheet_screen.dart';
 import '../../widgets/primary_button.dart';
-import '../../widgets/route_illustration.dart';
 import 'finding_driver_screen.dart';
 import 'order_tracking_screen.dart';
 
@@ -200,7 +200,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       body: SafeArea(
         child: MapSheetScreen(
           backgroundHeight: 150,
-          background: RouteIllustration(showRoute: _dropoff != null),
+          background: LiveMapView(pickup: _pickup, dropoff: _dropoff, showRoute: _dropoff != null),
           children: [
             Row(
               children: [

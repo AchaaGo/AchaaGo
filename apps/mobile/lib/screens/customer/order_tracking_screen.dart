@@ -12,10 +12,10 @@ import '../../state/app_scope.dart';
 import '../../state/order_watcher.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/live_map_view.dart';
 import '../../widgets/map_sheet_screen.dart';
 import '../../widgets/order_summary_card.dart';
 import '../../widgets/primary_button.dart';
-import '../../widgets/route_illustration.dart';
 import 'order_complete_screen.dart';
 
 /// Screen 6 in AGENTS.md: live driver tracking for an assigned order.
@@ -182,7 +182,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
-          background: RouteIllustration(showRoute: true, showTruck: driver?.location != null),
+          background: LiveMapView(
+            pickup: _order.pickup,
+            dropoff: _order.dropoff,
+            driverLocation: driver?.location,
+            showRoute: true,
+            showTruck: driver?.location != null,
+          ),
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

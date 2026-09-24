@@ -10,9 +10,9 @@ import '../../realtime/order_channel.dart';
 import '../../state/app_scope.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/live_map_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/map_sheet_screen.dart';
-import '../../widgets/route_illustration.dart';
 
 /// `GET /t/{token}` + `/ws/tracking/{token}` — no login required. Mirrors
 /// apps/web's PublicTracking.tsx.
@@ -100,7 +100,13 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
-          background: RouteIllustration(showRoute: true, showTruck: driver != null),
+          background: LiveMapView(
+            pickup: order.pickup,
+            dropoff: order.dropoff,
+            driverLocation: driver?.location,
+            showRoute: true,
+            showTruck: driver != null,
+          ),
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

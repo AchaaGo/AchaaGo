@@ -8,6 +8,7 @@ import '../../state/app_scope.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/live_map_view.dart';
 import '../../widgets/order_summary_card.dart';
 import '../../widgets/primary_button.dart';
 
@@ -54,6 +55,19 @@ class _DriverActiveOrderScreenState extends State<DriverActiveOrderScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 200,
+                child: LiveMapView(
+                  pickup: _order.pickup,
+                  dropoff: _order.dropoff,
+                  showRoute: true,
+                  myLocationEnabled: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
             OrderSummaryCard(order: _order),
             const SizedBox(height: 14),
             Card(

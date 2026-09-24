@@ -7,9 +7,9 @@ import '../../state/app_scope.dart';
 import '../../state/order_watcher.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/live_map_view.dart';
 import '../../widgets/map_sheet_screen.dart';
 import '../../widgets/order_summary_card.dart';
-import '../../widgets/route_illustration.dart';
 import 'order_complete_screen.dart';
 import 'order_tracking_screen.dart';
 
@@ -93,7 +93,7 @@ class _FindingDriverScreenState extends State<FindingDriverScreen> with OrderWat
       child: Scaffold(
         body: SafeArea(
           child: MapSheetScreen(
-            background: const RouteIllustration(showRoute: true, pulse: true),
+            background: LiveMapView(pickup: _order.pickup, dropoff: _order.dropoff, showRoute: true, pulse: true),
             children: [
               Text(Strings.findingHeading, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 6),
