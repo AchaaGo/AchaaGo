@@ -58,7 +58,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
   return <main className="phone auth-screen">
     <section className="auth-hero">
       <Route className="auth-route-art" size={330} strokeWidth={.5} aria-hidden="true"/>
-      <Brand light/>
+      <Brand/>
       <h1 className="display">{heading || 'Ачаагаа хэдхэн товшилтоор тээвэрлүүл'}</h1>
     </section>
     <section className="auth-body">
