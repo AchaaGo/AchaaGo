@@ -9,6 +9,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
   const [step, setStep] = useState<'phone'|'code'>('phone');
   const [phone, setPhone] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +23,8 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
   useEffect(() => { if (step === 'code' && !busy) codeInput.current?.focus(); }, [step, busy]);
 
   async function request() {
-    if (busy || phone.length !== 8 || !acceptedTerms) return;
+    if (busy || phone.length !== 8) return;
+    if (!acceptedTerms) { setTermsError(true); return; }
     setBusy(true); setError('');
     try {
       await api('/auth/otp/request', {method:'POST', body:JSON.stringify({phone:'+976'+phone})});
@@ -68,13 +70,13 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
         <div className="phone-field"><span className="phone-prefix">+976</span><input id="phone" className="field" type="tel" inputMode="numeric" autoComplete="tel-national" value={phoneFmt(phone)} disabled={busy} onChange={e => {setPhone(e.target.value.replace(/\D/g,'').slice(0,8)); setError('');}} placeholder="8888 8888" aria-describedby={error ? 'auth-error' : undefined} aria-invalid={!!error}/></div>
         <div className="terms-consent">
           <label className="terms-consent-label" htmlFor="accept-terms">
-            <input id="accept-terms" type="checkbox" required checked={acceptedTerms} disabled={busy} onChange={e => setAcceptedTerms(e.target.checked)} aria-describedby="terms-help"/>
+            <input id="accept-terms" type="checkbox" required checked={acceptedTerms} disabled={busy} onChange={e => {setAcceptedTerms(e.target.checked); setTermsError(false);}} onInvalid={() => setTermsError(true)} aria-invalid={termsError || undefined} aria-describedby={termsError ? 'terms-help' : undefined}/>
             <span><span className="terms-consent-text">{copy.acceptTerms}</span><a href="/terms" target="_blank" rel="noopener noreferrer">{copy.readTerms}<span className="sr-only"> — {copy.newWindow}</span></a></span>
           </label>
         </div>
-        <p id="terms-help" className="field-help">{acceptedTerms ? copy.termsAccepted : copy.termsRequired}</p>
+        {termsError && <p id="terms-help" className="error" role="alert">{copy.termsValidation}</p>}
         {error && <p id="auth-error" className="error" role="alert">{error}</p>}
-        <button className="btn btn-primary" disabled={phone.length !== 8 || !acceptedTerms || busy} aria-describedby="terms-help">{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.requestCode : 'Үргэлжлүүлэх'}</button>
+        <button className="btn btn-primary" disabled={phone.length !== 8 || !acceptedTerms || busy} aria-describedby={termsError ? 'terms-help' : undefined}>{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.requestCode : 'Үргэлжлүүлэх'}</button>
         <span className="sr-only" role="status">{busy ? copy.requestCode : ''}</span>
       </form>
     </section>
