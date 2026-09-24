@@ -108,8 +108,14 @@ def make_order(status="pending"):
     return SimpleNamespace(id="ord-1", status=status, driver_id=None)
 
 
-def make_driver(status="approved", is_online=True, last_seen=None):
-    return SimpleNamespace(id="drv-1", status=status, is_online=is_online, last_seen=last_seen if last_seen is not None else now())
+_FRESH_LOCATION = object()
+
+
+def make_driver(status="approved", is_online=True, last_seen=_FRESH_LOCATION):
+    # A sentinel, not None, marks "caller didn't ask for a specific last_seen":
+    # None is itself a value under test (a driver who never sent a location).
+    return SimpleNamespace(id="drv-1", status=status, is_online=is_online,
+                           last_seen=now() if last_seen is _FRESH_LOCATION else last_seen)
 
 
 class FakeAssignDb:
