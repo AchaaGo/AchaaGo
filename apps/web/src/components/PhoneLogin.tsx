@@ -1,15 +1,82 @@
 'use client';
-import {useEffect,useState} from 'react';
-import {ArrowLeft,Route} from 'lucide-react';
-import {api,ApiError,phoneFmt} from '@/lib/api';
+import {useEffect, useRef, useState} from 'react';
+import {ArrowLeft, Route} from 'lucide-react';
+import {api, ApiError, phoneFmt} from '@/lib/api';
 import {Brand} from './Brand';
+import {customerCopy as copy} from './customerCopy';
 
-export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void;heading?:string}) {
-  const [step,setStep]=useState<'phone'|'code'>('phone'), [phone,setPhone]=useState(''), [code,setCode]=useState('');
-  const [busy,setBusy]=useState(false), [error,setError]=useState(''), [seconds,setSeconds]=useState(0);
-  useEffect(()=>{if(!seconds)return;const id=setInterval(()=>setSeconds(v=>Math.max(0,v-1)),1000);return()=>clearInterval(id)},[seconds]);
-  async function request(){setBusy(true);setError('');try{await api('/auth/otp/request',{method:'POST',body:JSON.stringify({phone:'+976'+phone})});setStep('code');setSeconds(60)}catch(e){setError((e as ApiError).message)}finally{setBusy(false)}}
-  async function verify(){setBusy(true);setError('');try{const value=await api<{user:any}>('/auth/otp/verify',{method:'POST',body:JSON.stringify({phone:'+976'+phone,code})});onDone(value.user)}catch(e){setError((e as ApiError).message)}finally{setBusy(false)}}
-  if(step==='code') return <main className="phone" style={{padding:'20px 24px 32px',display:'flex',flexDirection:'column',gap:22}}><button className="icon-btn" aria-label="Буцах" onClick={()=>setStep('phone')}><ArrowLeft/></button><div><h1 className="display" style={{fontSize:24}}>Кодоо оруулна уу</h1><p className="muted">+976 {phoneFmt(phone)} дугаарт илгээсэн 4 оронтой кодыг оруулна уу.</p></div><input className="field" style={{height:72,textAlign:'center',fontSize:32,fontWeight:700,letterSpacing:18,paddingLeft:18}} inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,2))} placeholder="00" aria-label="Баталгаажуулах код"/>{error&&<p className="error" role="alert">{error}</p>}<button style={{alignSelf:'flex-start',minHeight:44,border:0,background:'transparent',fontWeight:600,textDecoration:'underline'}} onClick={request} disabled={seconds>0||busy}>{seconds?`Дахин илгээх · ${seconds} сек`:'Код дахин илгээх'}</button><div style={{flex:1}}/><button className="btn btn-primary" disabled={code.length!==2||busy} onClick={verify}>{busy?<span className="spinner"/>:'Баталгаажуулах'}</button></main>;
-  return <main className="phone" style={{display:'flex',flexDirection:'column'}}><section style={{height:340,flexShrink:0,position:'relative',overflow:'hidden',padding:'40px 24px 28px',background:'var(--ink)',color:'white',display:'flex',flexDirection:'column',justifyContent:'space-between'}}><Route size={330} color="#f2a516" strokeWidth={.5} style={{position:'absolute',right:-100,top:40,opacity:.35}}/><Brand light/><h1 className="display" style={{fontSize:26,lineHeight:1.25,position:'relative',margin:0}}>{heading||'Ачаагаа хэдхэн товшилтоор тээвэрлүүл'}</h1></section><section style={{padding:'28px 24px 32px',display:'flex',flexDirection:'column',gap:18,flex:1}}><div><h2 style={{fontSize:22,margin:'0 0 6px'}}>Утасны дугаараа оруулна уу</h2><p className="muted" style={{margin:0,lineHeight:1.5}}>Бид таны дугаарт 4 оронтой баталгаажуулах код илгээнэ.</p></div><div style={{display:'flex',gap:10}}><span style={{width:84,height:56,flexShrink:0,border:'1px solid var(--line-strong)',borderRadius:14,background:'var(--ground)',display:'grid',placeItems:'center',fontWeight:600}}>+976</span><input autoFocus className="field" type="tel" inputMode="numeric" value={phoneFmt(phone)} onChange={e=>setPhone(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="8888 8888" aria-label="Утасны дугаар"/></div>{error&&<p className="error" role="alert">{error}</p>}<button className="btn btn-primary" disabled={phone.length!==8||busy} onClick={request}>{busy?<span className="spinner"/>:'Үргэлжлүүлэх'}</button><div style={{flex:1}}/><p className="muted" style={{fontSize:13,textAlign:'center'}}>Үргэлжлүүлснээр та <a href="/terms" style={{color:'var(--ink)',fontWeight:600}}>үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p></section></main>;
+export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<void>;heading?:string}) {
+  const [step, setStep] = useState<'phone'|'code'>('phone');
+  const [phone, setPhone] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [seconds, setSeconds] = useState(0);
+  const codeInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!seconds) return;
+    const id = setInterval(() => setSeconds(v => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(id);
+  }, [seconds]);
+  useEffect(() => { if (step === 'code' && !busy) codeInput.current?.focus(); }, [step, busy]);
+
+  async function request() {
+    if (busy || phone.length !== 8 || !acceptedTerms) return;
+    setBusy(true); setError('');
+    try {
+      await api('/auth/otp/request', {method:'POST', body:JSON.stringify({phone:'+976'+phone})});
+      setCode(''); setStep('code'); setSeconds(60);
+    } catch (e) { setError(e instanceof ApiError ? e.message : copy.error); }
+    finally { setBusy(false); }
+  }
+  async function verify() {
+    // Preserve the existing two-digit test OTP contract.
+    if (busy || code.length !== 2) return;
+    setBusy(true); setError('');
+    try {
+      const value = await api<{user:any}>('/auth/otp/verify', {method:'POST', body:JSON.stringify({phone:'+976'+phone, code})});
+      await onDone(value.user);
+    } catch (e) { setError(e instanceof ApiError ? e.message : copy.error); }
+    finally { setBusy(false); }
+  }
+
+  if (step === 'code') return <main className="phone auth-screen code-screen">
+    <button className="icon-btn" aria-label="Утасны дугаар руу буцах" disabled={busy} onClick={() => {setStep('phone'); setError('');}}><ArrowLeft aria-hidden="true"/></button>
+    <div><h1 className="display">Кодоо оруулна уу</h1><p className="muted">+976 {phoneFmt(phone)} дугаарт илгээсэн кодыг оруулна уу.</p></div>
+    <form className="auth-form" onSubmit={e => {e.preventDefault(); void verify();}} aria-busy={busy}>
+      <label className="field-label" htmlFor="otp">Баталгаажуулах код</label>
+      <input ref={codeInput} id="otp" className="field otp-field" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={2} value={code} disabled={busy} onChange={e => {setCode(e.target.value.replace(/\D/g,'').slice(0,2)); setError('');}} placeholder="00" aria-describedby={error ? 'otp-help auth-error' : 'otp-help'} aria-invalid={!!error}/>
+      <p id="otp-help" className="field-help">{copy.codeHelp}</p>
+      {error && <p id="auth-error" className="error" role="alert">{error}</p>}
+      <button type="button" className="text-button resend-button" onClick={request} disabled={seconds > 0 || busy}>{seconds ? `Дахин илгээх · ${seconds} сек` : 'Код дахин илгээх'}</button>
+      <button className="btn btn-primary" disabled={code.length !== 2 || busy}>{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.verifyCode : 'Баталгаажуулах'}</button>
+      <span className="sr-only" role="status">{busy ? copy.loading : ''}</span>
+    </form>
+  </main>;
+
+  return <main className="phone auth-screen">
+    <section className="auth-hero">
+      <Route className="auth-route-art" size={330} strokeWidth={.5} aria-hidden="true"/>
+      <Brand light/>
+      <h1 className="display">{heading || 'Ачаагаа хэдхэн товшилтоор тээвэрлүүл'}</h1>
+    </section>
+    <section className="auth-body">
+      <div><h2>Утасны дугаараа оруулна уу</h2><p className="muted">{copy.phoneIntro}</p></div>
+      <form className="auth-form" onSubmit={e => {e.preventDefault(); void request();}} aria-busy={busy}>
+        <label className="field-label" htmlFor="phone">Утасны дугаар</label>
+        <div className="phone-field"><span className="phone-prefix">+976</span><input id="phone" className="field" type="tel" inputMode="numeric" autoComplete="tel-national" value={phoneFmt(phone)} disabled={busy} onChange={e => {setPhone(e.target.value.replace(/\D/g,'').slice(0,8)); setError('');}} placeholder="8888 8888" aria-describedby={error ? 'auth-error' : undefined} aria-invalid={!!error}/></div>
+        <div className="terms-consent">
+          <label className="terms-consent-label" htmlFor="accept-terms">
+            <input id="accept-terms" type="checkbox" required checked={acceptedTerms} disabled={busy} onChange={e => setAcceptedTerms(e.target.checked)} aria-describedby="terms-help"/>
+            <span><span className="terms-consent-text">{copy.acceptTerms}</span><a href="/terms" target="_blank" rel="noopener noreferrer">{copy.readTerms}<span className="sr-only"> — {copy.newWindow}</span></a></span>
+          </label>
+        </div>
+        <p id="terms-help" className="field-help">{acceptedTerms ? copy.termsAccepted : copy.termsRequired}</p>
+        {error && <p id="auth-error" className="error" role="alert">{error}</p>}
+        <button className="btn btn-primary" disabled={phone.length !== 8 || !acceptedTerms || busy} aria-describedby="terms-help">{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.requestCode : 'Үргэлжлүүлэх'}</button>
+        <span className="sr-only" role="status">{busy ? copy.requestCode : ''}</span>
+      </form>
+    </section>
+  </main>;
 }
