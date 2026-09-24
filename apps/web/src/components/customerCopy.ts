@@ -33,4 +33,5 @@ export const customerCopy = {
   cancelled: 'Захиалга цуцлагдлаа.',
   noDriver: 'Жолооч олдсонгүй. Та дахин захиалах боломжтой.',
   qpayLoading: 'Төлбөрийн мэдээлэл авч байна…',
+  reconnecting: 'Холболт тасарлаа. Дахин холбогдож байна…',
 } as const;
