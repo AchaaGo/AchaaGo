@@ -220,3 +220,11 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 @media (max-width:767px) {
   .auth-screen .auth-body { padding-bottom:calc(44px + env(safe-area-inset-bottom)); }
 }
+
+/* A shared Places search edits either endpoint without losing the other. */
+.address-targets { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.address-targets button { min-height:44px; padding:8px 10px; border:1px solid var(--line); border-radius:12px; background:white; font-size:14px; font-weight:600; cursor:pointer; }
+.address-targets button[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); text-decoration:underline; text-underline-offset:4px; }
+.address-targets button:disabled { cursor:wait; }
+.current-pickup { font-size:13px; margin-top:4px; }
+.address-edit { display:block; min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--ink-deep); font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
