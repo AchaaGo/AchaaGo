@@ -179,27 +179,48 @@ live position via the OS location layer).
 **This needs its own API key — you cannot reuse the website's key.** A
 Google Cloud key is restricted either to "Websites" (checks the page's
 URL) or to "Android apps" (checks the app's package name + signing
-fingerprint), never both. Create a second key for this app:
+fingerprint), never both.
 
-1. Google Cloud Console → **APIs & Services → Library** → enable
+The "Android apps" restriction only works as protection if the signing
+key behind that fingerprint stays private — so unlike the API key itself
+(which is unavoidably visible inside any built APK; that's normal, the
+restriction is what protects it), **the debug keystore that produces the
+fingerprint must never be committed to this repo.** This repo is public;
+anyone who could download the keystore file could sign their own app
+with the same identity and use our Maps key through it, which would
+defeat the restriction completely. It's kept only as a base64 GitHub
+secret instead, decoded at build time.
+
+One-time setup:
+
+1. Generate a fixed debug keystore (anywhere outside this repo):
+   ```bash
+   keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android \
+     -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10950 \
+     -dname "CN=AchaaGo CI Debug,O=AchaaGo,C=MN"
+   keytool -list -v -keystore debug.keystore -storepass android -alias androiddebugkey   # prints the SHA-1
+   base64 -w0 debug.keystore   # the value for the secret below
+   ```
+2. Google Cloud Console → **APIs & Services → Library** → enable
    **"Maps SDK for Android"** (a different listing from the website's
    "Maps JavaScript API").
-2. **Credentials → Create Credentials → API key.**
-3. Edit the new key → **Application restrictions → Android apps** → add
-   package name `mn.achaago.achaago_mobile` and the SHA-1 fingerprint of
-   `apps/mobile/ci/debug.keystore` (a fixed, non-secret debug keystore
-   committed to this repo so every build has the same fingerprint —
-   `keytool -list -v -keystore apps/mobile/ci/debug.keystore -storepass android -alias androiddebugkey`
-   prints it).
-4. **API restrictions** → restrict to just "Maps SDK for Android".
-5. Add the key as a GitHub repository secret named
-   `GOOGLE_MAPS_API_KEY_ANDROID` (Settings → Secrets and variables →
-   Actions) — never commit it or paste it into `.env`. `mobile-apk.yml`
-   reads it from there and `tool/prepare_android.sh` writes it into the
-   generated manifest.
+3. **Credentials → Create Credentials → API key.**
+4. Edit the new key → **Application restrictions → Android apps** → add
+   package name `mn.achaago.achaago_mobile` and the SHA-1 fingerprint
+   from step 1.
+5. **API restrictions** → restrict to just "Maps SDK for Android".
+6. Add two GitHub repository secrets (Settings → Secrets and variables →
+   Actions) — never commit either or paste them into `.env`:
+   - `GOOGLE_MAPS_API_KEY_ANDROID` — the API key itself.
+   - `MOBILE_DEBUG_KEYSTORE_BASE64` — the base64 output from step 1.
+   `mobile-apk.yml` passes both through; `tool/prepare_android.sh` writes
+   the key into the generated manifest and decodes the keystore into
+   `~/.android/debug.keystore` before the build. Delete your local
+   `debug.keystore` file once it's uploaded — nothing needs it after that.
 
 Running locally: `flutter run --dart-define=API_BASE_URL=...` doesn't
-reach the manifest, so export `GOOGLE_MAPS_API_KEY_ANDROID` before
+reach the manifest, so export `GOOGLE_MAPS_API_KEY_ANDROID` (and, to
+reproduce the same fingerprint, `MOBILE_DEBUG_KEYSTORE_BASE64`) before
 `./tool/prepare_android.sh` instead. Without a key, the map still
 renders — Android's Maps SDK shows blank tiles rather than failing.
 

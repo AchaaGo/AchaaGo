@@ -29,10 +29,17 @@ if ! grep -q com.google.android.geo.API_KEY "$manifest"; then
   perl -0pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_ANDROID} // ""; s#</application>#    <meta-data android:name="com.google.android.geo.API_KEY" android:value="$key"/>\n    </application>#' "$manifest"
 fi
 
-# A fixed debug-signing keystore (its password is the public Android default,
-# "android" — never a secret) so the app's SHA-1 fingerprint is the same on
-# every machine and CI run. Without this, each fresh checkout/runner would
-# get its own random debug key, and a Maps API key restricted to "Android
-# apps" would only ever match one of them.
-mkdir -p "$HOME/.android"
-cp ci/debug.keystore "$HOME/.android/debug.keystore"
+# A fixed debug-signing keystore so the app's SHA-1 fingerprint is the same
+# on every machine and CI run — without this, each fresh checkout/runner
+# gets its own random debug key, and a Maps API key restricted to "Android
+# apps" would only ever match one of them. The keystore file itself must
+# NOT be committed to this repo (it's public): anyone who could download it
+# could sign their own app with the same identity and use our Maps key
+# through it, defeating the "Android apps" restriction entirely. It lives
+# only as a base64 GitHub secret (see README.md), decoded here at build
+# time. Its password is the public Android default, "android" — that part
+# really isn't secret, only the key material is.
+if [ -n "${MOBILE_DEBUG_KEYSTORE_BASE64:-}" ]; then
+  mkdir -p "$HOME/.android"
+  echo "$MOBILE_DEBUG_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/debug.keystore"
+fi
