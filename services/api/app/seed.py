@@ -2,19 +2,14 @@ import asyncio
 import re
 from sqlalchemy import select
 from .config import settings
+from .catalog import ensure_booking_services
 from .db import Session, engine
 from .models import Driver, PricingSettings, Service, User, Vehicle
 
 
 async def seed():
     async with Session() as db:
-        services = [
-            {"code": "amjirgaa", "name_mn": "Амжиргаа", "description_mn": "[ТАЙЛБАР]", "icon": "package", "base_fare": 10000, "per_km_rate": 1500, "sort_order": 0},
-            {"code": "porter", "name_mn": "Портер", "description_mn": "Ачааны машин · 1 тн хүртэл", "icon": "truck", "base_fare": 30000, "per_km_rate": 2000, "sort_order": 1},
-        ]
-        for data in services:
-            if not await db.scalar(select(Service).where(Service.code == data["code"])):
-                db.add(Service(**data))
+        await ensure_booking_services(db)
         if not await db.get(PricingSettings, 1):
             db.add(PricingSettings(id=1))
         if settings.bootstrap_admin_phone:
