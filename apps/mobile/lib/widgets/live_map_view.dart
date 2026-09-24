@@ -107,21 +107,21 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           markerId: const MarkerId('pickup'),
           position: _toLatLng(pickup),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          zIndex: 1,
+          zIndexInt: 1,
         ),
       if (dropoff != null)
         Marker(
           markerId: const MarkerId('dropoff'),
           position: _toLatLng(dropoff),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          zIndex: 1,
+          zIndexInt: 1,
         ),
       if (widget.showTruck && widget.driverLocation != null)
         Marker(
           markerId: const MarkerId('driver'),
           position: _toLatLng(widget.driverLocation!),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          zIndex: 2,
+          zIndexInt: 2,
         ),
     };
     final polylines = <Polyline>{
