@@ -4,8 +4,17 @@ Mobile-first truck ordering for Ulaanbaatar. The repository contains a Next.js c
 
 ## Start
 
+Create a `.env` in the repo root (never commit it) with at least:
+
+```
+POSTGRES_PASSWORD=<random>
+JWT_SECRET=<random, 32+ characters>
+BOOTSTRAP_ADMIN_PHONE=+97699000001
+```
+
+Everything else has a development default — see `services/api/app/config.py` for the full list (SMS/maps/QPay/push providers, ports, etc.).
+
 ```bash
-python3 scripts/bootstrap_env.py http://localhost:8187
 docker compose up --build -d
 curl http://localhost:8187/api/health
 ```

@@ -47,8 +47,8 @@ change at all, only wiring on the client once real Maps credentials exist.
 
 `POST /driver/push-token` and an `Outbox(kind="push", ...)` row (written in
 `services/api/app/orders.py` `change_status` when an order is assigned)
-already exist, but `FCM_PROVIDER=console` and `FCM_PROJECT_ID` is empty in
-`.env.example` — there is no real Firebase project yet. Per the task's
+already exist, but `FCM_PROVIDER=console` and `FCM_PROJECT_ID` default to
+empty — there is no real Firebase project yet. Per the task's
 constraints ("do not implement production push credentials unless they
 already exist"), the mobile app does not call `/driver/push-token` or
 integrate the `firebase_messaging` plugin. Once a real Firebase project
