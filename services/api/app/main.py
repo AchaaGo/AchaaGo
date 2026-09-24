@@ -451,9 +451,11 @@ async def accept(order_id: str, user: Customer, db: DB):
 async def driver_status(order_id: str, data: StatusInput, user: Customer, db: DB):
     driver = await driver_for_user(db, user)
     order = await get_order(db, order_id, user, locked=True)
-    if order.driver_id != driver.id or data.status not in {"driver_arriving", "arrived", "picked_up", "delivered", "completed"}:
+    if order.driver_id != driver.id or data.status not in {"driver_arriving", "arrived", "picked_up", "delivered", "completed", "cancelled"}:
         raise HTTPException(403, "FORBIDDEN")
-    await change_status(db, order, data.status, user.id)
+    if data.status == "cancelled" and not data.reason:
+        raise HTTPException(422, "REASON_REQUIRED")
+    await change_status(db, order, data.status, user.id, data.reason)
     await db.commit()
     return await order_json(db, order)
 
