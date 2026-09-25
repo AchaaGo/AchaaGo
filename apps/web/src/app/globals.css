@@ -228,3 +228,7 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 .address-targets button:disabled { cursor:wait; }
 .current-pickup { font-size:13px; margin-top:4px; }
 .address-edit { display:block; min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--ink-deep); font-size:13px; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+
+.map-route-status { position:absolute; top:10px; left:12px; right:12px; z-index:3; display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+.map-route-status span { min-width:0; flex:1; }
+.map-route-status button { min-height:44px; padding:8px; border:0; border-radius:8px; background:var(--accent-soft); color:var(--ink); font-weight:600; cursor:pointer; }
