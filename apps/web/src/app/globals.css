@@ -232,3 +232,26 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 .map-route-status { position:absolute; top:10px; left:12px; right:12px; z-index:3; display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
 .map-route-status span { min-width:0; flex:1; }
 .map-route-status button { min-height:44px; padding:8px; border:0; border-radius:8px; background:var(--accent-soft); color:var(--ink); font-weight:600; cursor:pointer; }
+
+/* Home menu/profile dialogs leave the map and its existing corner controls intact. */
+.customer-panel { position:fixed; inset:auto 0 0; margin:0 auto; width:min(480px,100%); max-width:100%; max-height:90dvh; padding:12px 16px calc(16px + env(safe-area-inset-bottom)); border:0; border-radius:24px 24px 0 0; background:var(--surface); color:var(--ink); overflow-y:auto; overscroll-behavior:contain; }
+.customer-panel[open] { animation:customer-panel-enter .18s ease-out; }
+.customer-panel::backdrop { background:#19231f40; }
+.customer-panel-handle { width:36px; height:4px; margin:0 auto 12px; border-radius:4px; background:var(--line); }
+.customer-panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.customer-panel-header h2 { margin:0; font-size:20px; font-weight:700; }
+.customer-panel-close { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border:0; border-radius:50%; background:var(--ground); cursor:pointer; }
+.customer-panel-identity { display:grid; gap:4px; padding:4px 0 20px; overflow-wrap:anywhere; }
+.customer-panel-identity strong { font-size:20px; font-weight:600; }
+.customer-panel-identity > span { font-size:14px; color:var(--muted); }
+.customer-panel-row { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; padding:12px 0; border:0; border-bottom:1px solid var(--line); background:var(--surface); color:var(--ink); text-align:left; text-decoration:none; font-size:14px; line-height:1.5; cursor:pointer; }
+.customer-panel-row > svg { flex-shrink:0; }
+.customer-panel-label { min-width:0; flex:1; overflow-wrap:anywhere; }
+.customer-panel-row small { flex-shrink:0; padding:2px 6px; border-radius:6px; background:var(--ground); color:var(--muted); font-size:11px; }
+.customer-panel-row:disabled { color:var(--muted); cursor:not-allowed; }
+.customer-panel-row:last-child { border-bottom:0; }
+.customer-panel-logout { margin-top:8px; }
+.customer-order-dot { display:inline-block; width:8px; height:8px; margin-left:8px; border-radius:50%; background:var(--accent); vertical-align:middle; }
+.customer-panel-error { margin:12px 0 0; color:var(--error); font-size:13px; }
+@keyframes customer-panel-enter { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .customer-panel[open] { animation:none; } }

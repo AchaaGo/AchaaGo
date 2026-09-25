@@ -7,6 +7,7 @@ import {mn} from '@/lib/messages';
 import {GoogleMapView} from './GoogleMapView';
 import {PhoneLogin} from './PhoneLogin';
 import {QpayDialog} from './QpayDialog';
+import {CustomerPanel} from './CustomerPanel';
 import {VehicleCards} from './VehicleCards';
 import {customerCopy as copy} from './customerCopy';
 
@@ -35,6 +36,7 @@ export function CustomerFlow() {
   const [places,setPlaces]=useState<PlaceRow[]>([]), [placesLoading,setPlacesLoading]=useState(false), [highlight,setHighlight]=useState(-1);
   const [quote,setQuote]=useState<Quote|null>(null), [loaders,setLoaders]=useState(0), [pay,setPay]=useState<'cash'|'qpay'>('qpay');
   const [order,setOrder]=useState<Order|null>(null), [busy,setBusy]=useState(false), [error,setError]=useState(''), [user,setUser]=useState<any>(null), [qpay,setQpay]=useState<any>(null);
+  const [panel,setPanel]=useState<'menu'|'profile'|null>(null);
   const [disconnected,setDisconnected]=useState(false);
   const socket=useRef<WebSocket|null>(null), searchTimer=useRef<ReturnType<typeof setTimeout>|null>(null), reconnectTimer=useRef<ReturnType<typeof setTimeout>|null>(null), orderDone=useRef(false);
   const staleGuard=useRef(createStaleGuard()).current, sessionToken=useRef<google.maps.places.AutocompleteSessionToken|null>(null);
@@ -128,7 +130,7 @@ export function CustomerFlow() {
   if(screen==='login')return <PhoneLogin onDone={loggedIn}/>;
 
   if(screen==='home')return <main className="phone customer-screen">
-    <div className="map-stage home-map"><GoogleMapView pickup={pickup}/><div className="map-toolbar"><button className="icon-btn" aria-label="Цэс"><Menu aria-hidden="true"/></button><button className="icon-btn" aria-label="Профайл"><UserRound aria-hidden="true"/></button></div></div>
+    <div className="map-stage home-map"><GoogleMapView pickup={pickup}/><div className="map-toolbar"><button className="icon-btn" aria-label="Цэс" aria-haspopup="dialog" aria-expanded={panel==='menu'} aria-controls={panel==='menu'?'customer-panel':undefined} onClick={()=>setPanel('menu')}><Menu aria-hidden="true"/></button><button className="icon-btn" aria-label="Профайл" aria-haspopup="dialog" aria-expanded={panel==='profile'} aria-controls={panel==='profile'?'customer-panel':undefined} onClick={()=>setPanel('profile')}><UserRound aria-hidden="true"/></button></div></div>
     <section className="sheet booking-sheet" aria-labelledby="home-title">
       <div className="booking-handle" aria-hidden="true"/>
       <span className="muted">Сайн байна уу{user?.name?`, ${user.name}`:''}</span>
@@ -139,6 +141,7 @@ export function CustomerFlow() {
       <VehicleCards services={services} onSelect={begin} home/>
       {!services.length&&<div className="status-card" role="status"><p>{copy.noServices}</p><button className="btn btn-outline" onClick={boot}>{copy.retry}</button></div>}
     </section>
+    {panel&&<CustomerPanel kind={panel} customer={user} hasActiveOrder={!!order&&['pending','assigned','driver_arriving','arrived','picked_up','delivered'].includes(order.status)} onClose={()=>setPanel(null)}/>}
   </main>;
 
   if(screen==='route')return <main className="phone customer-screen route-screen">
