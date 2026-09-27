@@ -407,7 +407,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(Strings.changeAddress, style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600, fontSize: 13)),
+            const Text(Strings.changeAddress, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600, fontSize: 13)),
           ],
         ),
       ),

@@ -146,14 +146,12 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
           color: Colors.white,
           width: 9,
-          zIndexInt: 0,
         ),
         Polyline(
           polylineId: const PolylineId('route'),
           points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
           color: AppColors.ink,
           width: 5,
-          zIndexInt: 1,
         ),
       ],
     };
