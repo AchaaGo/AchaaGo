@@ -186,6 +186,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
             pickup: _order.pickup,
             dropoff: _order.dropoff,
             driverLocation: driver?.location,
+            routePolyline: _order.polyline,
             showRoute: true,
             showTruck: driver?.location != null,
           ),

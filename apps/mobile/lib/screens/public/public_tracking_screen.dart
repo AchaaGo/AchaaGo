@@ -104,6 +104,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
             pickup: order.pickup,
             dropoff: order.dropoff,
             driverLocation: driver?.location,
+            routePolyline: order.polyline,
             showRoute: true,
             showTruck: driver != null,
           ),

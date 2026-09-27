@@ -238,10 +238,10 @@ class _ServiceCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 25,
-              backgroundColor: AppColors.ink,
+              backgroundColor: AppColors.inkDeep,
               child: Icon(
                 service.icon == 'package' ? Icons.inventory_2_outlined : Icons.local_shipping_outlined,
-                color: AppColors.accent,
+                color: AppColors.mint,
               ),
             ),
             const SizedBox(height: 9),

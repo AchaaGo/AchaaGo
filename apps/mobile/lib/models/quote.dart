@@ -50,6 +50,7 @@ class Quote {
     required this.loaderRate,
     required this.approximate,
     required this.quoteToken,
+    this.polyline,
   });
 
   final double distanceKm;
@@ -58,6 +59,11 @@ class Quote {
   final int loaderRate;
   final bool approximate;
   final String quoteToken;
+
+  /// Google encoded polyline for the driving route, from the same
+  /// maps-provider call the server used for `distanceKm`/pricing. Null
+  /// under the demo maps provider; screens fall back to a straight line.
+  final String? polyline;
 
   ServicePrice? priceFor(String serviceId) {
     for (final price in prices) {
@@ -75,5 +81,6 @@ class Quote {
         loaderRate: json['loader_rate'] as int? ?? 0,
         approximate: json['approximate'] as bool? ?? false,
         quoteToken: json['quote_token'] as String,
+        polyline: json['polyline'] as String?,
       );
 }

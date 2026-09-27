@@ -93,7 +93,13 @@ class _FindingDriverScreenState extends State<FindingDriverScreen> with OrderWat
       child: Scaffold(
         body: SafeArea(
           child: MapSheetScreen(
-            background: LiveMapView(pickup: _order.pickup, dropoff: _order.dropoff, showRoute: true, pulse: true),
+            background: LiveMapView(
+              pickup: _order.pickup,
+              dropoff: _order.dropoff,
+              routePolyline: _order.polyline,
+              showRoute: true,
+              pulse: true,
+            ),
             children: [
               Text(Strings.findingHeading, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 6),

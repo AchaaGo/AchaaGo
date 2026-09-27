@@ -62,6 +62,7 @@ class _DriverActiveOrderScreenState extends State<DriverActiveOrderScreen> {
                 child: LiveMapView(
                   pickup: _order.pickup,
                   dropoff: _order.dropoff,
+                  routePolyline: _order.polyline,
                   showRoute: true,
                   myLocationEnabled: true,
                 ),

@@ -46,6 +46,16 @@ class Strings {
   static const dropoffRequiredHint = 'Захиалахын тулд хүргэх хаягаа оруулна уу.';
   static String orderButton(String serviceName, String priceText) => '$serviceName захиалах · $priceText';
 
+  // Editable pickup (route screen address editing)
+  static const searchPickup = 'Авах хаягаа хайх';
+  static const searchDestination = 'Хүргэх хаягаа хайх';
+  static const useCurrentLocation = 'Одоогийн байршил ашиглах';
+  static const locationFailed = 'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл жагсаалтаас сонгоно уу.';
+  static const needsPickup = 'Авах хаягаа сонгоно уу.';
+  static const changeAddress = 'Өөрчлөх';
+  static const changePickup = 'Авах хаягийг өөрчлөх';
+  static const changeDestination = 'Хүргэх хаягийг өөрчлөх';
+
   // Finding / tracking
   static const findingHeading = 'Жолооч хайж байна…';
   static String findingSubtitle(String serviceName) => 'Ойролцоох $serviceName жолооч нарт захиалгыг илгээлээ.';

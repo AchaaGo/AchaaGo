@@ -74,6 +74,7 @@ class Order {
     this.trackingToken,
     this.rating,
     this.canCancel,
+    this.polyline,
   });
 
   final String id;
@@ -95,6 +96,11 @@ class Order {
   final String? trackingToken;
   final int? rating;
   final bool? canCancel;
+
+  /// Google encoded polyline for the route actually driven, computed once
+  /// at order creation (see Quote.polyline). Null under the demo maps
+  /// provider; screens fall back to a straight line.
+  final String? polyline;
 
   bool get isActive => activeOrderStatuses.contains(status);
   bool get isTerminal => terminalOrderStatuses.contains(status);
@@ -118,5 +124,6 @@ class Order {
         trackingToken: json['tracking_token'] as String?,
         rating: json['rating'] as int?,
         canCancel: json['can_cancel'] as bool?,
+        polyline: json['polyline'] as String?,
       );
 }

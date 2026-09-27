@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../core/route_polyline.dart';
 import '../models/point.dart';
 import '../theme/app_theme.dart';
 
@@ -11,17 +12,20 @@ LatLng _toLatLng(GeoPoint point) => LatLng(point.lat, point.lng);
 /// The real map behind the customer and driver route/tracking screens,
 /// replacing the decorative RouteIllustration now that a Google Maps API
 /// key exists (see apps/mobile/README.md). Mirrors the web app's
-/// GoogleMapView.tsx: pickup/dropoff markers, a straight line between them
-/// (no Directions API — same scope limit as the web app), and a pulsing
-/// circle while a driver is being found. If no key is configured, the
-/// native Android Maps SDK itself falls back to blank tiles rather than
-/// crashing, so no extra fallback UI is needed here.
+/// GoogleMapView.tsx: pickup/dropoff markers, the server's own road-following
+/// route when [routePolyline] decodes (same encoded polyline the backend
+/// already returns from `/quotes` and orders — see
+/// apps/mobile/lib/core/route_polyline.dart), falling back to a straight
+/// line otherwise, and a pulsing circle while a driver is being found. If no
+/// key is configured, the native Android Maps SDK itself falls back to
+/// blank tiles rather than crashing, so no extra fallback UI is needed here.
 class LiveMapView extends StatefulWidget {
   const LiveMapView({
     super.key,
     this.pickup,
     this.dropoff,
     this.driverLocation,
+    this.routePolyline,
     this.showRoute = false,
     this.pulse = false,
     this.showTruck = false,
@@ -31,6 +35,9 @@ class LiveMapView extends StatefulWidget {
   final GeoPoint? pickup;
   final GeoPoint? dropoff;
   final GeoPoint? driverLocation;
+
+  /// Google encoded polyline from `Quote.polyline` / `Order.polyline`.
+  final String? routePolyline;
   final bool showRoute;
   final bool pulse;
   final bool showTruck;
@@ -48,11 +55,13 @@ class LiveMapView extends StatefulWidget {
 class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStateMixin {
   GoogleMapController? _controller;
   AnimationController? _pulseController;
+  List<LatLng>? _routePoints;
 
   @override
   void initState() {
     super.initState();
     if (widget.pulse) _startPulse();
+    _routePoints = decodeRoutePolyline(widget.routePolyline);
   }
 
   @override
@@ -63,7 +72,12 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
       _pulseController!.dispose();
       _pulseController = null;
     }
-    if (widget.pickup != oldWidget.pickup || widget.dropoff != oldWidget.dropoff) _fitBounds();
+    if (widget.routePolyline != oldWidget.routePolyline) {
+      _routePoints = decodeRoutePolyline(widget.routePolyline);
+    }
+    if (widget.pickup != oldWidget.pickup || widget.dropoff != oldWidget.dropoff || widget.routePolyline != oldWidget.routePolyline) {
+      _fitBounds();
+    }
   }
 
   void _startPulse() {
@@ -84,16 +98,16 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
     final pickup = widget.pickup;
     final dropoff = widget.dropoff;
     if (controller == null || pickup == null || dropoff == null) return;
-    final bounds = LatLngBounds(
-      southwest: LatLng(
-        pickup.lat < dropoff.lat ? pickup.lat : dropoff.lat,
-        pickup.lng < dropoff.lng ? pickup.lng : dropoff.lng,
-      ),
-      northeast: LatLng(
-        pickup.lat > dropoff.lat ? pickup.lat : dropoff.lat,
-        pickup.lng > dropoff.lng ? pickup.lng : dropoff.lng,
-      ),
-    );
+    final points = [_toLatLng(pickup), _toLatLng(dropoff), if (widget.showRoute) ...?_routePoints];
+    var south = points.first.latitude, north = points.first.latitude;
+    var west = points.first.longitude, east = points.first.longitude;
+    for (final point in points.skip(1)) {
+      if (point.latitude < south) south = point.latitude;
+      if (point.latitude > north) north = point.latitude;
+      if (point.longitude < west) west = point.longitude;
+      if (point.longitude > east) east = point.longitude;
+    }
+    final bounds = LatLngBounds(southwest: LatLng(south, west), northeast: LatLng(north, east));
     await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 56));
   }
 
@@ -124,14 +138,24 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           zIndexInt: 2,
         ),
     };
+    final routePoints = _routePoints;
     final polylines = <Polyline>{
-      if (widget.showRoute && pickup != null && dropoff != null)
+      if (widget.showRoute && pickup != null && dropoff != null) ...[
+        Polyline(
+          polylineId: const PolylineId('route-outline'),
+          points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
+          color: Colors.white,
+          width: 9,
+          zIndexInt: 0,
+        ),
         Polyline(
           polylineId: const PolylineId('route'),
-          points: [_toLatLng(pickup), _toLatLng(dropoff)],
+          points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
           color: AppColors.ink,
-          width: 4,
+          width: 5,
+          zIndexInt: 1,
         ),
+      ],
     };
     final pulseFraction = _pulseController?.value ?? 0;
     final circles = <Circle>{
