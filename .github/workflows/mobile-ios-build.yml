@@ -1,0 +1,36 @@
+name: Build iOS app (compile check)
+
+# Verifies the Flutter app actually compiles for iOS. This does NOT produce
+# an installable build — that needs an Apple Developer account for code
+# signing, which this workflow deliberately skips (--no-codesign) so it can
+# run for free with no account at all. Installing on a real device/Simulator
+# has to happen from a Mac; see apps/mobile/README.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/mobile-**', 'claude/ios-**']
+    paths: ['apps/mobile/**', '.github/workflows/mobile-ios-build.yml']
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      GOOGLE_MAPS_API_KEY_IOS: ${{ secrets.GOOGLE_MAPS_API_KEY_IOS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate iOS project
+        run: ./tool/prepare_ios.sh
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (unsigned — proves it compiles, no Apple Developer account needed)
+        run: flutter build ios --debug --no-codesign
