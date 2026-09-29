@@ -255,3 +255,23 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 .customer-panel-error { margin:12px 0 0; color:var(--error); font-size:13px; }
 @keyframes customer-panel-enter { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .customer-panel[open] { animation:none; } }
+
+/* Brand color accents belong only to the customer home screen. */
+.home-screen .booking-sheet { background:linear-gradient(180deg,var(--surface) 60%,#eef5ef); }
+.home-welcome { padding:18px; margin-bottom:16px; border-radius:18px; background:var(--ink-deep); color:var(--surface); }
+.home-welcome .muted { color:var(--mint); font-size:14px; }
+.home-screen .home-welcome h1 { margin:6px 0 0; color:var(--surface); }
+.home-screen .home-search { background:var(--accent); border-color:var(--accent); color:var(--ink); }
+.home-screen .booking-handle { background:var(--mint); }
+.home-screen .service-card { border-color:var(--mint); background:var(--surface); }
+.home-screen .service-icon { background:var(--mint); color:var(--ink-deep); }
+.home-screen .service-price { color:var(--ink-deep); }
+@media (max-width:767px) {
+  .home-screen .vehicle-card { border-color:var(--mint); }
+  .home-screen .vehicle-art { padding:5px; border-radius:14px; background:#e4f1e8; }
+  .home-screen .vehicle-title strong { color:var(--ink-deep); }
+}
+@media (hover:hover) {
+  .home-screen .home-search:hover:not(:disabled) { background:var(--accent-soft); border-color:var(--accent); }
+  .home-screen .vehicle-card:hover, .home-screen .service-card:hover { border-color:var(--accent); background:var(--accent-soft); }
+}
