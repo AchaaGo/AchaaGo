@@ -1,5 +1,8 @@
 // Customer presentation strings. Keep transport and Maps helpers unchanged.
 export const customerCopy = {
+  switchLight: 'Гэгээтэй горимд шилжих',
+  switchDark: 'Харанхуй горимд шилжих',
+  switchTheme: 'Өнгөний горим солих',
   chooseVehicle: 'Тээврийн хэрэгслээ сонго',
   express: 'Шуурхай',
   priceAfterRoute: 'Хаяг сонгоход үнэ гарна',
