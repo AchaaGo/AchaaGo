@@ -256,22 +256,12 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 @keyframes customer-panel-enter { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .customer-panel[open] { animation:none; } }
 
-/* Brand color accents belong only to the customer home screen. */
-.home-screen .booking-sheet { background:linear-gradient(180deg,var(--surface) 60%,#eef5ef); }
-.home-welcome { padding:18px; margin-bottom:16px; border-radius:18px; background:var(--ink-deep); color:var(--surface); }
-.home-welcome .muted { color:var(--mint); font-size:14px; }
-.home-screen .home-welcome h1 { margin:6px 0 0; color:var(--surface); }
-.home-screen .home-search { background:var(--accent); border-color:var(--accent); color:var(--ink); }
-.home-screen .booking-handle { background:var(--mint); }
-.home-screen .service-card { border-color:var(--mint); background:var(--surface); }
-.home-screen .service-icon { background:var(--mint); color:var(--ink-deep); }
-.home-screen .service-price { color:var(--ink-deep); }
-@media (max-width:767px) {
-  .home-screen .vehicle-card { border-color:var(--mint); }
-  .home-screen .vehicle-art { padding:5px; border-radius:14px; background:#e4f1e8; }
-  .home-screen .vehicle-title strong { color:var(--ink-deep); }
-}
-@media (hover:hover) {
-  .home-screen .home-search:hover:not(:disabled) { background:var(--accent-soft); border-color:var(--accent); }
-  .home-screen .vehicle-card:hover, .home-screen .service-card:hover { border-color:var(--accent); background:var(--accent-soft); }
-}
+/* Colorful customer entry page; OTP and booking screens retain their styles. */
+.phone-entry .auth-hero { background:var(--ink-deep); border-bottom:4px solid var(--accent); color:var(--surface); }
+.phone-entry .auth-hero h1 { color:var(--surface); }
+.phone-entry .auth-route-art { color:var(--mint); opacity:.22; }
+.phone-entry .auth-body { background:linear-gradient(155deg,var(--surface) 45%,#eef5ef); }
+.phone-entry .phone-prefix { background:#e4f1e8; border-color:var(--mint); color:var(--ink-deep); }
+.phone-entry #phone { border-color:var(--mint); }
+.phone-entry .terms-consent { background:var(--accent-soft); border-color:#f1d7c8; }
+.phone-entry .terms-consent:has(input:checked) { border-color:var(--accent); }

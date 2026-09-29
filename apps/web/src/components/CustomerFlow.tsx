@@ -129,14 +129,12 @@ export function CustomerFlow() {
   if(screen==='loading')return <main className="phone customer-screen flow-loading"><div role="status">{error ? <><p>{error}</p><button className="btn btn-accent" onClick={boot}>{copy.retry}</button></> : <><span className="spinner" aria-hidden="true"/><p>{copy.loading}</p></>}</div></main>;
   if(screen==='login')return <PhoneLogin onDone={loggedIn}/>;
 
-  if(screen==='home')return <main className="phone customer-screen home-screen">
+  if(screen==='home')return <main className="phone customer-screen">
     <div className="map-stage home-map"><GoogleMapView pickup={pickup}/><div className="map-toolbar"><button className="icon-btn" aria-label="Цэс" aria-haspopup="dialog" aria-expanded={panel==='menu'} aria-controls={panel==='menu'?'customer-panel':undefined} onClick={()=>setPanel('menu')}><Menu aria-hidden="true"/></button><button className="icon-btn" aria-label="Профайл" aria-haspopup="dialog" aria-expanded={panel==='profile'} aria-controls={panel==='profile'?'customer-panel':undefined} onClick={()=>setPanel('profile')}><UserRound aria-hidden="true"/></button></div></div>
     <section className="sheet booking-sheet" aria-labelledby="home-title">
       <div className="booking-handle" aria-hidden="true"/>
-      <div className="home-welcome">
       <span className="muted">Сайн байна уу{user?.name?`, ${user.name}`:''}</span>
       <h1 id="home-title" className="display">Юу ачуулах вэ?</h1>
-      </div>
       {notice&&<p className="status-card" role="status">{notice}</p>}
       <button className="btn home-search" disabled={!services.length} onClick={()=>begin(services.find(s=>s.code==='porter')?.id)}><Search size={20} aria-hidden="true"/>Хаашаа ачих вэ?<ChevronRight size={18} aria-hidden="true" style={{marginLeft:'auto'}}/></button>
       <div className="service-grid desktop-vehicle-selector">{services.map(s=><button className="service-card" key={s.id} onClick={()=>begin(s.id)}><span className="service-icon" aria-hidden="true"><ServiceIcon type={s.icon}/></span><strong className="display">{s.name_mn}</strong><small className="muted">{s.description_mn}</small><b className="service-price">{copy.basePrice} {money(s.base_fare)}</b></button>)}</div>

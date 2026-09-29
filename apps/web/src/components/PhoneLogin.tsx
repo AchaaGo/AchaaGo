@@ -57,10 +57,10 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     </form>
   </main>;
 
-  return <main className="phone auth-screen">
+  return <main className={`phone auth-screen${heading ? '' : ' phone-entry'}`}>
     <section className="auth-hero">
       <Route className="auth-route-art" size={330} strokeWidth={.5} aria-hidden="true"/>
-      <Brand/>
+      <Brand light={!heading}/>
       <h1 className="display">{heading || 'Ачаагаа хэдхэн товшилтоор тээвэрлүүл'}</h1>
     </section>
     <section className="auth-body">
