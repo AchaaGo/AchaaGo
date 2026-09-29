@@ -18,6 +18,12 @@ plist=ios/Runner/Info.plist
 if ! grep -q NSLocationWhenInUseUsageDescription "$plist"; then
   perl -0pi -e 's#</dict>\n</plist>#\t<key>NSLocationWhenInUseUsageDescription</key>\n\t<string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>\n</dict>\n</plist>#' "$plist"
 fi
+# A failed substitution above would silently leave the permission missing —
+# no error, just a crash the first time the app asks for location, possibly
+# weeks from now on someone else's Mac. Fail here instead, loudly, in case a
+# future Flutter version changes Info.plist's template enough that the
+# pattern above stops matching.
+grep -q NSLocationWhenInUseUsageDescription "$plist" || { echo "prepare_ios.sh: Info.plist location-permission edit didn't take (template changed?)" >&2; exit 1; }
 
 # google_maps_flutter's iOS side needs GMSServices.provideAPIKey() called
 # before anything else touches the SDK — there's no manifest-style
@@ -35,3 +41,8 @@ if ! grep -q GoogleMaps "$appdelegate"; then
   perl -pi -e 's#^import Flutter#import Flutter\nimport GoogleMaps#' "$appdelegate"
   perl -0pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_IOS} // ""; s#(GeneratedPluginRegistrant\.register\(with: self\))#GMSServices.provideAPIKey("$key")\n    $1#' "$appdelegate"
 fi
+# Same reasoning as the Info.plist check above: a silently-skipped edit here
+# means google_maps_flutter's iOS side never gets provideAPIKey() called at
+# all, which fails at runtime, not at build time — fail loudly here instead.
+grep -q "import GoogleMaps" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's GoogleMaps import didn't take (template changed?)" >&2; exit 1; }
+grep -q "GMSServices.provideAPIKey" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's provideAPIKey call didn't take (template changed?)" >&2; exit 1; }

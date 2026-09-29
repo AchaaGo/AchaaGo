@@ -254,9 +254,10 @@ apps", or "iOS apps", never more than one:
    **"Maps SDK for iOS"**.
 2. **Credentials → Create Credentials → API key.**
 3. Edit the new key → **Application restrictions → iOS apps** → add the
-   bundle identifier. Run `./tool/prepare_ios.sh` once, then check
-   `ios/Runner.xcodeproj` in Xcode (General tab → Identity → Bundle
-   Identifier) for the exact value rather than guessing it.
+   bundle identifier: `mn.achaago.achaagoMobile` (confirmed via a CI
+   build — note this is camelCase with no underscore, unlike Android's
+   `mn.achaago.achaago_mobile`; Flutter names the two platforms
+   differently from the same `--org`/project name).
 4. **API restrictions** → restrict to just "Maps SDK for iOS".
 5. Add a GitHub repository secret named `GOOGLE_MAPS_API_KEY_IOS` with
    the key. Unlike Android, iOS needs no separate signing-identity secret
@@ -281,3 +282,9 @@ thing to look at.
   `/ws/tracking/{token}` WebSockets, backed by a 5–8s REST poll fallback
   in case a socket never connects or drops, so tracking still works even
   on flaky connections.
+- **iOS build**: `flutter build ios` currently prints a warning that
+  `flutter_secure_storage` and `google_maps_flutter_ios` don't yet support
+  Swift Package Manager and still resolve via CocoaPods, which Flutter
+  says "will become an error in a future version." Not a problem today —
+  both plugins install and build fine — just something to watch if a
+  Flutter upgrade ever makes that warning start failing the build.
