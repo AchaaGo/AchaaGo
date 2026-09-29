@@ -44,5 +44,5 @@ fi
 # Same reasoning as the Info.plist check above: a silently-skipped edit here
 # means google_maps_flutter's iOS side never gets provideAPIKey() called at
 # all, which fails at runtime, not at build time — fail loudly here instead.
-grep -q "import GoogleMaps" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's GoogleMaps import didn't take (template changed?)" >&2; exit 1; }
-grep -q "GMSServices.provideAPIKey" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's provideAPIKey call didn't take (template changed?)" >&2; exit 1; }
+grep -q "import GoogleMaps" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's GoogleMaps import didn't take (template changed?). Current content:" >&2; cat "$appdelegate" >&2; exit 1; }
+grep -q "GMSServices.provideAPIKey" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's provideAPIKey call didn't take (template changed?). Current content:" >&2; cat "$appdelegate" >&2; exit 1; }
