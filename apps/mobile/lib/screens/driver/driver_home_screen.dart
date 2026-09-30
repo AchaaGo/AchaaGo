@@ -49,7 +49,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _load() async {
-    final appState = AppScope.of(context);
+    final appState = AppScope.read(context);
     setState(() {
       _loading = true;
       _error = null;

@@ -40,7 +40,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Future<void> _load() async {
-    final appState = AppScope.of(context);
+    final appState = AppScope.read(context);
     setState(() {
       _loading = true;
       _error = null;

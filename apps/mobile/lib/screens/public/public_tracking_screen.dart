@@ -45,7 +45,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
   }
 
   Future<void> _load() async {
-    final appState = AppScope.of(context);
+    final appState = AppScope.read(context);
     setState(() => _error = null);
     try {
       final order = await appState.customerRepository.publicTracking(widget.token);
