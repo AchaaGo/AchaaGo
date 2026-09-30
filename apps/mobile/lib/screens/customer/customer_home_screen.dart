@@ -66,6 +66,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         _error = e.message;
         _loading = false;
       });
+    } catch (e) {
+      // Anything that isn't an ApiException used to leave this screen
+      // spinning forever. Show the retry state, with the exception type so
+      // a bug report from a real device says what actually failed.
+      if (!mounted) return;
+      setState(() {
+        _error = '${Strings.offlineBody}\n(${e.runtimeType})';
+        _loading = false;
+      });
     }
   }
 
