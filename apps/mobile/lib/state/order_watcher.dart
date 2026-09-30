@@ -23,7 +23,7 @@ mixin OrderWatcherMixin<T extends StatefulWidget> on State<T> {
   }
 
   Future<void> _connect(String orderId, ValueChanged<Order> onUpdate) async {
-    final appState = AppScope.of(context);
+    final appState = AppScope.read(context);
     final token = await appState.sessionStore.readAccessToken();
     if (token == null || !mounted || _watchedOrderId != orderId) return;
     try {

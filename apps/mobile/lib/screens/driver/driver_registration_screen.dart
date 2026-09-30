@@ -53,7 +53,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   }
 
   Future<void> _loadServices() async {
-    final appState = AppScope.of(context);
+    final appState = AppScope.read(context);
     try {
       final services = await appState.customerRepository.services();
       if (!mounted) return;
