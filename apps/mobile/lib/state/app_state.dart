@@ -34,17 +34,30 @@ class AppState extends ChangeNotifier {
 
   /// Runs once at startup: is there a stored session, and is it still
   /// valid against the backend (`GET /auth/me`)?
+  ///
+  /// Wrapped in a catch-all: `flutter_secure_storage` reads the Android
+  /// Keystore, which is documented to throw on some devices/OS versions
+  /// on first-ever access (unrelated to whether a session was actually
+  /// saved). SplashScreen awaits this with nothing else catching errors,
+  /// so any unhandled exception here leaves the app stuck on the splash
+  /// spinner forever instead of reaching the login screen. Falling back
+  /// to signed-out is always safe — worst case the user has to log in
+  /// again, same as an expired session.
   Future<void> bootstrap() async {
-    if (!await authRepository.hasStoredSession()) {
-      status = AuthStatus.signedOut;
-      notifyListeners();
-      return;
-    }
     try {
-      user = await authRepository.me();
-      status = AuthStatus.signedIn;
+      if (!await authRepository.hasStoredSession()) {
+        status = AuthStatus.signedOut;
+        notifyListeners();
+        return;
+      }
+      try {
+        user = await authRepository.me();
+        status = AuthStatus.signedIn;
+      } catch (_) {
+        await sessionStore.clear();
+        status = AuthStatus.signedOut;
+      }
     } catch (_) {
-      await sessionStore.clear();
       status = AuthStatus.signedOut;
     }
     notifyListeners();
