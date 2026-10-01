@@ -221,30 +221,52 @@ renders — Android's Maps SDK shows blank tiles rather than failing.
 
 ## Running on iOS (Mac only)
 
-Flutter's iOS tooling only runs on macOS — there's no way around needing a
-Mac for this part, paid or free. Two ways to actually see the app run,
-neither requiring an Apple Developer account ($99/year):
+Anything iOS needs a Mac with Xcode — there's no way around that, paid or
+free. None of the options below needs an Apple Developer account
+($99/year); that's only for TestFlight and the App Store.
 
-- **iOS Simulator** — no physical iPhone needed at all:
-  ```bash
-  cd apps/mobile
-  ./tool/prepare_ios.sh
-  open -a Simulator   # boots a simulated iPhone
-  flutter run          # builds and launches on it
-  ```
-- **Your own iPhone over USB** — same commands, with the phone connected
-  and unlocked; `flutter run` will target it instead once you pick it if
-  prompted. Apps installed this way (free personal-team signing) expire
-  after 7 days and need reinstalling — fine for testing, not for handing
-  the phone to someone else.
+**1. Simulator app straight from CI (no Flutter install).** Easiest. Needs
+an Apple Silicon Mac (the CI Mac builds arm64 only) and Xcode, opened once
+so it installs the Simulator and an iOS runtime.
+
+1. GitHub → **Actions** → **Build iOS app** → latest run → download the
+   **achaago-ios-simulator** artifact.
+2. Unzip it, then unzip the `AchaaGo-ios-simulator.zip` inside, which
+   gives a `Runner.app`.
+3. `open -a Simulator`, then drag `Runner.app` onto the Simulator window.
+   Or: `xcrun simctl install booted Runner.app && xcrun simctl launch booted mn.achaago.achaagoMobile`
+4. If macOS refuses to open it: `xattr -cr Runner.app`, then retry.
+
+This is a debug build for the Simulator only; it can't go on a real
+iPhone. It talks to the server baked in at build time (the workflow's
+`api_base_url`/`ws_base_url` inputs).
+
+**2. Build it yourself in the Simulator.** Needs Flutter and CocoaPods.
+Required on an Intel Mac.
+
+```bash
+cd apps/mobile
+./tool/prepare_ios.sh
+open -a Simulator   # boots a simulated iPhone
+flutter run \
+  --dart-define=API_BASE_URL=http://64.119.31.106:8187/api \
+  --dart-define=WS_BASE_URL=ws://64.119.31.106:8187
+```
+
+**3. Your own iPhone over USB.** Same commands as 2 with the phone plugged
+in and unlocked, after a one-time setup: Developer Mode on (Settings →
+Privacy & Security), and `open ios/Runner.xcworkspace` → Runner target →
+Signing & Capabilities → Team = your Apple ID (Personal Team). Apps
+installed with free signing expire after 7 days and need reinstalling.
 
 `tool/prepare_ios.sh` is the iOS equivalent of `prepare_android.sh`: it
-generates the (uncommitted) `ios/` project and wires up the location
-permission and Google Maps key the same way. iOS has never been run
-through Xcode in this project before, so treat the first attempt as a
-real test — `.github/workflows/mobile-ios-build.yml` proves it *compiles*
-(on a free GitHub-hosted Mac runner, also no account needed), but only
-actually launching it on your Mac proves it *runs*.
+generates the (uncommitted) `ios/` project, adds the location permission,
+and wires up the Google Maps key. It also adds an App Transport Security
+exception for plain HTTP, the counterpart of Android's
+`usesCleartextTraffic` — remove both once the server has HTTPS.
+`.github/workflows/mobile-ios-build.yml` proves the app compiles for iOS
+(on a free GitHub-hosted Mac, no account needed), but only launching it
+proves it *runs*, and nobody has done that on iOS yet.
 
 **The iOS Maps key is a third, separate key** — not the website's, not
 the Android one. Google Cloud restricts a key to "Websites", "Android
@@ -265,11 +287,10 @@ apps", or "iOS apps", never more than one:
    into a Maps key restriction the way Android's is.
 
 Running locally: export `GOOGLE_MAPS_API_KEY_IOS` before
-`./tool/prepare_ios.sh`. Android's Maps SDK is confirmed to render blank
-tiles rather than fail without a key; iOS's SDK is documented to behave
-the same way, but that's only been checked against docs here, not run —
-if a map screen crashes on iOS with no key configured, that's the first
-thing to look at.
+`./tool/prepare_ios.sh`. Without one the script bakes in an obviously
+invalid placeholder key, so the map should come up blank rather than the
+app failing — unconfirmed on a real run. If a map screen crashes on iOS
+with no key configured, that's the first thing to look at.
 
 ## Design notes / deliberate limitations
 

@@ -1,12 +1,20 @@
-name: Build iOS app (compile check)
+name: Build iOS app
 
-# Verifies the Flutter app actually compiles for iOS. This does NOT produce
-# an installable build — that needs an Apple Developer account for code
-# signing, which this workflow deliberately skips (--no-codesign) so it can
-# run for free with no account at all. Installing on a real device/Simulator
-# has to happen from a Mac; see apps/mobile/README.md.
+# Two builds. The unsigned device build (--no-codesign) only proves the app
+# compiles for a real iPhone; it needs no Apple Developer account and can't
+# be installed. The Simulator build is the one worth downloading: unzip it on
+# a Mac with Xcode and drag it onto the iOS Simulator, no Flutter install
+# needed. Putting it on a real iPhone needs code signing, which needs an
+# Apple Developer account — see apps/mobile/README.md.
 on:
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: REST API address the app talks to
+        default: http://64.119.31.106:8187/api
+      ws_base_url:
+        description: WebSocket address for live tracking
+        default: ws://64.119.31.106:8187
   push:
     branches: [main, 'claude/mobile-**', 'claude/ios-**']
     paths: ['apps/mobile/**', '.github/workflows/mobile-ios-build.yml']
@@ -18,6 +26,8 @@ jobs:
       run:
         working-directory: apps/mobile
     env:
+      API_BASE_URL: ${{ inputs.api_base_url || 'http://64.119.31.106:8187/api' }}
+      WS_BASE_URL: ${{ inputs.ws_base_url || 'ws://64.119.31.106:8187' }}
       GOOGLE_MAPS_API_KEY_IOS: ${{ secrets.GOOGLE_MAPS_API_KEY_IOS }}
     steps:
       - uses: actions/checkout@v4
@@ -32,5 +42,20 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build iOS (unsigned — proves it compiles, no Apple Developer account needed)
+      - name: Build for device (unsigned compile check)
         run: flutter build ios --debug --no-codesign
+
+      - name: Build for the iOS Simulator
+        run: flutter build ios --simulator --debug --dart-define=API_BASE_URL="$API_BASE_URL" --dart-define=WS_BASE_URL="$WS_BASE_URL"
+
+      # upload-artifact doesn't preserve file permissions, which would leave
+      # the app's executable non-executable; ditto does.
+      - name: Package the Simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app AchaaGo-ios-simulator.zip
+
+      - name: Upload Simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: achaago-ios-simulator
+          path: apps/mobile/AchaaGo-ios-simulator.zip
+          retention-days: 14
