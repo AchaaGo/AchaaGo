@@ -14,13 +14,18 @@ enum AuthStatus { unknown, signedOut, signedIn }
 /// management package) since a handful of screens don't need much more
 /// than "who is the user" shared across the tree.
 class AppState extends ChangeNotifier {
-  AppState({ApiClient? api, SessionStore? sessionStore})
-      : sessionStore = sessionStore ?? SessionStore(),
-        api = api ?? ApiClient() {
-    this.api.onSessionExpired = _handleSessionExpired;
-    authRepository = AuthRepository(this.api, this.sessionStore);
-    customerRepository = CustomerRepository(this.api);
-    driverRepository = DriverRepository(this.api);
+  /// The ApiClient must share this SessionStore: tokens are cached in
+  /// memory on the store instance, so a second instance wouldn't see them.
+  factory AppState({ApiClient? api, SessionStore? sessionStore}) {
+    final store = sessionStore ?? SessionStore();
+    return AppState._(api ?? ApiClient(sessionStore: store), store);
+  }
+
+  AppState._(this.api, this.sessionStore) {
+    api.onSessionExpired = _handleSessionExpired;
+    authRepository = AuthRepository(api, sessionStore);
+    customerRepository = CustomerRepository(api);
+    driverRepository = DriverRepository(api);
   }
 
   final SessionStore sessionStore;
@@ -34,17 +39,30 @@ class AppState extends ChangeNotifier {
 
   /// Runs once at startup: is there a stored session, and is it still
   /// valid against the backend (`GET /auth/me`)?
+  ///
+  /// Wrapped in a catch-all: `flutter_secure_storage` reads the Android
+  /// Keystore, which is documented to throw on some devices/OS versions
+  /// on first-ever access (unrelated to whether a session was actually
+  /// saved). SplashScreen awaits this with nothing else catching errors,
+  /// so any unhandled exception here leaves the app stuck on the splash
+  /// spinner forever instead of reaching the login screen. Falling back
+  /// to signed-out is always safe — worst case the user has to log in
+  /// again, same as an expired session.
   Future<void> bootstrap() async {
-    if (!await authRepository.hasStoredSession()) {
-      status = AuthStatus.signedOut;
-      notifyListeners();
-      return;
-    }
     try {
-      user = await authRepository.me();
-      status = AuthStatus.signedIn;
+      if (!await authRepository.hasStoredSession()) {
+        status = AuthStatus.signedOut;
+        notifyListeners();
+        return;
+      }
+      try {
+        user = await authRepository.me();
+        status = AuthStatus.signedIn;
+      } catch (_) {
+        await sessionStore.clear();
+        status = AuthStatus.signedOut;
+      }
     } catch (_) {
-      await sessionStore.clear();
       status = AuthStatus.signedOut;
     }
     notifyListeners();
