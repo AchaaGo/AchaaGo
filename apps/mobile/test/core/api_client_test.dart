@@ -6,11 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-/// These only exercise `auth: false` requests: the auth-token and
-/// refresh-token paths go through [SessionStore], which wraps the
-/// `flutter_secure_storage` plugin and needs a platform to talk to. That
-/// behavior is covered indirectly by the repository/screen code paths
-/// instead.
+/// These only exercise `auth: false` requests. Authenticated requests
+/// (token read from [SessionStore]) are covered in session_store_test.dart.
 void main() {
   group('ApiClient', () {
     test('decodes a successful JSON array response', () async {

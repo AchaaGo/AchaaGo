@@ -14,13 +14,18 @@ enum AuthStatus { unknown, signedOut, signedIn }
 /// management package) since a handful of screens don't need much more
 /// than "who is the user" shared across the tree.
 class AppState extends ChangeNotifier {
-  AppState({ApiClient? api, SessionStore? sessionStore})
-      : sessionStore = sessionStore ?? SessionStore(),
-        api = api ?? ApiClient() {
-    this.api.onSessionExpired = _handleSessionExpired;
-    authRepository = AuthRepository(this.api, this.sessionStore);
-    customerRepository = CustomerRepository(this.api);
-    driverRepository = DriverRepository(this.api);
+  /// The ApiClient must share this SessionStore: tokens are cached in
+  /// memory on the store instance, so a second instance wouldn't see them.
+  factory AppState({ApiClient? api, SessionStore? sessionStore}) {
+    final store = sessionStore ?? SessionStore();
+    return AppState._(api ?? ApiClient(sessionStore: store), store);
+  }
+
+  AppState._(this.api, this.sessionStore) {
+    api.onSessionExpired = _handleSessionExpired;
+    authRepository = AuthRepository(api, sessionStore);
+    customerRepository = CustomerRepository(api);
+    driverRepository = DriverRepository(api);
   }
 
   final SessionStore sessionStore;
