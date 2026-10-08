@@ -61,26 +61,21 @@ flutter pub get
 
 The script runs `flutter create --platforms=android`, which only adds the
 missing platform folder — it will not overwrite `lib/`, `test/`, or
-`pubspec.yaml`. For iOS, run `flutter create --platforms=ios --org mn.achaago .`
-and add the `Info.plist` entry below by hand.
+`pubspec.yaml`. For iOS, run `./tool/prepare_ios.sh` instead (needs a Mac —
+see "Running on iOS" below).
 
 Android is the priority target (`AGENTS.md`: "Android first, iOS later"),
-so that's what has been exercised while writing this app; the iOS project
-`flutter create` generates should work but hasn't been run through Xcode
-here.
+so that's what has been exercised most; iOS is CI-verified to compile (see
+below) but running it through Xcode/Simulator is on you to confirm.
 
 ### Location permission
 
 The customer (pickup location) and driver (online location updates) flows
 use the `geolocator` plugin. `tool/prepare_android.sh` adds the Android
-permissions. It also sets `android:usesCleartextTraffic="true"`, because the
+permissions and sets `android:usesCleartextTraffic="true"`, because the
 current server is plain `http://`; remove that once the server has HTTPS.
-iOS needs this in `ios/Runner/Info.plist`:
-
-```xml
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>AchaaGo needs your location to set the pickup point and show nearby drivers.</string>
-```
+`tool/prepare_ios.sh` adds the equivalent `NSLocationWhenInUseUsageDescription`
+to `ios/Runner/Info.plist`.
 
 The app works without granting the permission — it falls back to a fixed
 Ulaanbaatar-center pickup point for customers, and asks the driver to grant
@@ -224,6 +219,79 @@ reproduce the same fingerprint, `MOBILE_DEBUG_KEYSTORE_BASE64`) before
 `./tool/prepare_android.sh` instead. Without a key, the map still
 renders — Android's Maps SDK shows blank tiles rather than failing.
 
+## Running on iOS (Mac only)
+
+Anything iOS needs a Mac with Xcode — there's no way around that, paid or
+free. None of the options below needs an Apple Developer account
+($99/year); that's only for TestFlight and the App Store.
+
+**1. Simulator app straight from CI (no Flutter install).** Easiest. Needs
+an Apple Silicon Mac (the CI Mac builds arm64 only) and Xcode, opened once
+so it installs the Simulator and an iOS runtime.
+
+1. GitHub → **Actions** → **Build iOS app** → latest run → download the
+   **achaago-ios-simulator** artifact.
+2. Unzip it, then unzip the `AchaaGo-ios-simulator.zip` inside, which
+   gives a `Runner.app`.
+3. `open -a Simulator`, then drag `Runner.app` onto the Simulator window.
+   Or: `xcrun simctl install booted Runner.app && xcrun simctl launch booted mn.achaago.achaagoMobile`
+4. If macOS refuses to open it: `xattr -cr Runner.app`, then retry.
+
+This is a debug build for the Simulator only; it can't go on a real
+iPhone. It talks to the server baked in at build time (the workflow's
+`api_base_url`/`ws_base_url` inputs).
+
+**2. Build it yourself in the Simulator.** Needs Flutter and CocoaPods.
+Required on an Intel Mac.
+
+```bash
+cd apps/mobile
+./tool/prepare_ios.sh
+open -a Simulator   # boots a simulated iPhone
+flutter run \
+  --dart-define=API_BASE_URL=http://64.119.31.106:8187/api \
+  --dart-define=WS_BASE_URL=ws://64.119.31.106:8187
+```
+
+**3. Your own iPhone over USB.** Same commands as 2 with the phone plugged
+in and unlocked, after a one-time setup: Developer Mode on (Settings →
+Privacy & Security), and `open ios/Runner.xcworkspace` → Runner target →
+Signing & Capabilities → Team = your Apple ID (Personal Team). Apps
+installed with free signing expire after 7 days and need reinstalling.
+
+`tool/prepare_ios.sh` is the iOS equivalent of `prepare_android.sh`: it
+generates the (uncommitted) `ios/` project, adds the location permission,
+and wires up the Google Maps key. It also adds an App Transport Security
+exception for plain HTTP, the counterpart of Android's
+`usesCleartextTraffic` — remove both once the server has HTTPS.
+`.github/workflows/mobile-ios-build.yml` proves the app compiles for iOS
+(on a free GitHub-hosted Mac, no account needed), but only launching it
+proves it *runs*, and nobody has done that on iOS yet.
+
+**The iOS Maps key is a third, separate key** — not the website's, not
+the Android one. Google Cloud restricts a key to "Websites", "Android
+apps", or "iOS apps", never more than one:
+
+1. Google Cloud Console → **APIs & Services → Library** → enable
+   **"Maps SDK for iOS"**.
+2. **Credentials → Create Credentials → API key.**
+3. Edit the new key → **Application restrictions → iOS apps** → add the
+   bundle identifier: `mn.achaago.achaagoMobile` (confirmed via a CI
+   build — note this is camelCase with no underscore, unlike Android's
+   `mn.achaago.achaago_mobile`; Flutter names the two platforms
+   differently from the same `--org`/project name).
+4. **API restrictions** → restrict to just "Maps SDK for iOS".
+5. Add a GitHub repository secret named `GOOGLE_MAPS_API_KEY_IOS` with
+   the key. Unlike Android, iOS needs no separate signing-identity secret
+   — Apple's device/simulator signing isn't tied to a fingerprint baked
+   into a Maps key restriction the way Android's is.
+
+Running locally: export `GOOGLE_MAPS_API_KEY_IOS` before
+`./tool/prepare_ios.sh`. Without one the script bakes in an obviously
+invalid placeholder key, so the map should come up blank rather than the
+app failing — unconfirmed on a real run. If a map screen crashes on iOS
+with no key configured, that's the first thing to look at.
+
 ## Design notes / deliberate limitations
 
 - **QPay** renders whatever `POST /orders/{id}/qpay-invoice` returns (the
@@ -235,3 +303,9 @@ renders — Android's Maps SDK shows blank tiles rather than failing.
   `/ws/tracking/{token}` WebSockets, backed by a 5–8s REST poll fallback
   in case a socket never connects or drops, so tracking still works even
   on flaky connections.
+- **iOS build**: `flutter build ios` currently prints a warning that
+  `flutter_secure_storage` and `google_maps_flutter_ios` don't yet support
+  Swift Package Manager and still resolve via CocoaPods, which Flutter
+  says "will become an error in a future version." Not a problem today —
+  both plugins install and build fine — just something to watch if a
+  Flutter upgrade ever makes that warning start failing the build.
