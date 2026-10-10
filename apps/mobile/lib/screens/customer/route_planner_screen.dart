@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/formatting.dart';
@@ -19,12 +20,14 @@ import '../../widgets/primary_button.dart';
 import 'finding_driver_screen.dart';
 import 'order_tracking_screen.dart';
 
-const _ulaanbaatarCenter = GeoPoint(lat: 47.9186, lng: 106.9177, address: Strings.currentLocation);
+const _ulaanbaatarCenter =
+    GeoPoint(lat: 47.9186, lng: 106.9177, address: Strings.currentLocation);
 
 /// Screen 4 in AGENTS.md: pickup/drop-off, vehicle + loader + payment
 /// selection, and the server-priced order button.
 class RoutePlannerScreen extends StatefulWidget {
-  const RoutePlannerScreen({super.key, required this.initialServiceId, required this.services});
+  const RoutePlannerScreen(
+      {super.key, required this.initialServiceId, required this.services});
 
   final String initialServiceId;
   final List<ServiceOption> services;
@@ -81,12 +84,19 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
+        locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
       );
       if (!mounted) return;
-      setState(() => _pickup = GeoPoint(lat: position.latitude, lng: position.longitude, address: Strings.currentLocation));
+      setState(() => _pickup = GeoPoint(
+          lat: position.latitude,
+          lng: position.longitude,
+          address: Strings.currentLocation));
     } catch (_) {
       // Keep the Ulaanbaatar-center fallback — matches the web app's
       // silent geolocation catch in CustomerFlow.tsx.
@@ -126,8 +136,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _editingTarget = target;
       _suggestions = const [];
       _error = null;
-      _searchController.text =
-          target == 'pickup' ? (_pickup.address == Strings.currentLocation ? '' : _pickup.address) : (_dropoff?.address ?? '');
+      _searchController.text = target == 'pickup'
+          ? (_pickup.address == Strings.currentLocation ? '' : _pickup.address)
+          : (_dropoff?.address ?? '');
     });
     _searchFocusNode.requestFocus();
   }
@@ -158,6 +169,25 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     }
   }
 
+  Future<void> _pickOnMap(LatLng location) async {
+    if (_busy) return;
+    _debounce?.cancel();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _editingTarget = 'dropoff';
+      _suggestions = const [];
+      _dropoff = GeoPoint(
+        lat: location.latitude,
+        lng: location.longitude,
+        address: Strings.mapSelectedPoint,
+      );
+      _searchController.text = Strings.mapSelectedPoint;
+      _quote = null;
+      _error = null;
+    });
+    await _requote(AppScope.of(context));
+  }
+
   Future<void> _useCurrentLocationForPickup() async {
     setState(() {
       _busy = true;
@@ -167,18 +197,26 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     });
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
-      var permission = enabled ? await Geolocator.checkPermission() : LocationPermission.denied;
+      var permission = enabled
+          ? await Geolocator.checkPermission()
+          : LocationPermission.denied;
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (!enabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (!enabled ||
+          permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         throw Exception('location unavailable');
       }
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
+        locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
       );
       if (!mounted) return;
-      final place = GeoPoint(lat: position.latitude, lng: position.longitude, address: Strings.currentLocation);
+      final place = GeoPoint(
+          lat: position.latitude,
+          lng: position.longitude,
+          address: Strings.currentLocation);
       setState(() {
         _pickup = place;
         _pickupPending = false;
@@ -197,7 +235,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     if (dropoff == null || _pickupPending) return;
     setState(() => _busy = true);
     try {
-      final quote = await appState.customerRepository.quote(pickup: _pickup, dropoff: dropoff, loaders: _loaders);
+      final quote = await appState.customerRepository
+          .quote(pickup: _pickup, dropoff: dropoff, loaders: _loaders);
       if (mounted) setState(() => _quote = quote);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -216,7 +255,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final dropoff = _dropoff;
     final quote = _quote;
     final price = quote?.priceFor(_selectedServiceId);
-    if (_pickupPending || dropoff == null || quote == null || price == null) return;
+    if (_pickupPending || dropoff == null || quote == null || price == null) {
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -271,34 +312,45 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
-          backgroundHeight: 150,
+          backgroundHeight:
+              (MediaQuery.sizeOf(context).height * 0.32).clamp(220.0, 320.0),
           background: LiveMapView(
             pickup: _pickupPending ? null : _pickup,
             dropoff: _dropoff,
             routePolyline: _quote?.polyline,
             showRoute: !_pickupPending && _dropoff != null,
+            onPick: _pickOnMap,
           ),
           children: [
             Row(
               children: [
-                IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.arrow_back)),
+                IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back)),
                 const SizedBox(width: 4),
-                Expanded(child: Text(Strings.chooseVehicle, style: Theme.of(context).textTheme.titleLarge)),
+                Expanded(
+                    child: Text(Strings.chooseVehicle,
+                        style: Theme.of(context).textTheme.titleLarge)),
               ],
             ),
             const SizedBox(height: 8),
-            _buildAddressField(target: 'pickup', dot: true, hint: Strings.searchPickup),
+            _buildAddressField(
+                target: 'pickup', dot: true, hint: Strings.searchPickup),
             if (_editingTarget == 'pickup')
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: _busy ? null : _useCurrentLocationForPickup,
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 44)),
-                  child: const Text(Strings.useCurrentLocation, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero, minimumSize: const Size(0, 44)),
+                  child: const Text(Strings.useCurrentLocation,
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
             const SizedBox(height: 10),
-            _buildAddressField(target: 'dropoff', dot: false, hint: Strings.searchDestination),
+            _buildAddressField(
+                target: 'dropoff', dot: false, hint: Strings.searchDestination),
             if (_suggestions.isNotEmpty)
               Card(
                 margin: const EdgeInsets.only(top: 6),
@@ -317,25 +369,31 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(Strings.chooseVehicle, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                const Text(Strings.chooseVehicle,
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
                 if (_quote != null)
-                  Text('${_quote!.distanceKm.toStringAsFixed(1)} км · ~${_quote!.durationMinutes} мин',
+                  Text(
+                      '${_quote!.distanceKm.toStringAsFixed(1)} км · ~${_quote!.durationMinutes} мин',
                       style: const TextStyle(color: AppColors.muted)),
               ],
             ),
             const SizedBox(height: 10),
-            for (final price in _displayPrices) _ServicePriceRow(
-                  price: price,
-                  selected: price.service.id == _selectedServiceId,
-                  onTap: () => setState(() => _selectedServiceId = price.service.id),
-                ),
+            for (final price in _displayPrices)
+              _ServicePriceRow(
+                price: price,
+                selected: price.service.id == _selectedServiceId,
+                onTap: () =>
+                    setState(() => _selectedServiceId = price.service.id),
+              ),
             const SizedBox(height: 4),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _loaders > 0,
               onChanged: _busy ? null : _toggleLoader,
               activeThumbColor: AppColors.ink,
-              title: const Text(Strings.addLoader, style: TextStyle(fontWeight: FontWeight.w700)),
+              title: const Text(Strings.addLoader,
+                  style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text('+${formatMoney(_quote?.loaderRate ?? 25000)}'),
             ),
             Row(
@@ -362,14 +420,23 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             PrimaryButton(
               accent: true,
               busy: _busy,
-              label: Strings.orderButton(selectedPrice?.service.nameMn ?? 'Машин', formatMoney(selectedPrice?.breakdown.total ?? 0)),
-              onPressed: (_pickupPending || _dropoff == null || _quote == null || selectedPrice == null) ? null : _placeOrder,
+              label: Strings.orderButton(
+                  selectedPrice?.service.nameMn ?? 'Машин',
+                  formatMoney(selectedPrice?.breakdown.total ?? 0)),
+              onPressed: (_pickupPending ||
+                      _dropoff == null ||
+                      _quote == null ||
+                      selectedPrice == null)
+                  ? null
+                  : _placeOrder,
             ),
             if (_pickupPending || _dropoff == null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  _pickupPending ? Strings.needsPickup : Strings.dropoffRequiredHint,
+                  _pickupPending
+                      ? Strings.needsPickup
+                      : Strings.dropoffRequiredHint,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
@@ -380,7 +447,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     );
   }
 
-  Widget _buildAddressField({required String target, required bool dot, required String hint}) {
+  Widget _buildAddressField(
+      {required String target, required bool dot, required String hint}) {
     if (_editingTarget == target) {
       return _AddressRow(
         dot: dot,
@@ -403,11 +471,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               child: Text(
                 address ?? hint,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontWeight: FontWeight.w600, color: address == null ? AppColors.muted : null),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: address == null ? AppColors.muted : null),
               ),
             ),
             const SizedBox(width: 8),
-            const Text(Strings.changeAddress, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600, fontSize: 13)),
+            const Text(Strings.changeAddress,
+                style: TextStyle(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13)),
           ],
         ),
       ),
@@ -428,14 +502,19 @@ class _AddressRow extends StatelessWidget {
         : Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(color: AppColors.accent, border: Border.all(color: AppColors.ink, width: 2)),
+            decoration: BoxDecoration(
+                color: AppColors.accent,
+                border: Border.all(color: AppColors.ink, width: 2)),
           );
-    return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [marker, const SizedBox(width: 10), Expanded(child: child)]);
+    return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [marker, const SizedBox(width: 10), Expanded(child: child)]);
   }
 }
 
 class _ServicePriceRow extends StatelessWidget {
-  const _ServicePriceRow({required this.price, required this.selected, required this.onTap});
+  const _ServicePriceRow(
+      {required this.price, required this.selected, required this.onTap});
 
   final ServicePrice price;
   final bool selected;
@@ -452,7 +531,8 @@ class _ServicePriceRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: selected ? AppColors.accentSoft : Colors.white,
-            border: Border.all(color: selected ? AppColors.accent : AppColors.line, width: 2),
+            border: Border.all(
+                color: selected ? AppColors.accent : AppColors.line, width: 2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -461,7 +541,9 @@ class _ServicePriceRow extends StatelessWidget {
                 radius: 22,
                 backgroundColor: AppColors.inkDeep,
                 child: Icon(
-                  price.service.icon == 'package' ? Icons.inventory_2_outlined : Icons.local_shipping_outlined,
+                  price.service.icon == 'package'
+                      ? Icons.inventory_2_outlined
+                      : Icons.local_shipping_outlined,
                   color: AppColors.mint,
                 ),
               ),
@@ -470,12 +552,16 @@ class _ServicePriceRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(price.service.nameMn, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(price.service.descriptionMn, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                    Text(price.service.nameMn,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text(price.service.descriptionMn,
+                        style: const TextStyle(
+                            color: AppColors.muted, fontSize: 12)),
                   ],
                 ),
               ),
-              Text(formatMoney(price.breakdown.total), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(formatMoney(price.breakdown.total),
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
             ],
           ),
         ),
@@ -485,7 +571,8 @@ class _ServicePriceRow extends StatelessWidget {
 }
 
 class _PaymentOption extends StatelessWidget {
-  const _PaymentOption({required this.label, required this.selected, required this.onTap});
+  const _PaymentOption(
+      {required this.label, required this.selected, required this.onTap});
 
   final String label;
   final bool selected;
@@ -499,7 +586,8 @@ class _PaymentOption extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           backgroundColor: selected ? AppColors.accentSoft : Colors.white,
-          side: BorderSide(color: selected ? AppColors.accent : AppColors.line, width: 2),
+          side: BorderSide(
+              color: selected ? AppColors.accent : AppColors.line, width: 2),
         ),
         child: Text(label),
       ),

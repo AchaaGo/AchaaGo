@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/app_config.dart';
 import '../../core/api_exception.dart';
 import '../../core/formatting.dart';
 import '../../l10n/strings.dart';
@@ -22,6 +24,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
   final _phoneController = TextEditingController();
   String _phone = '';
   bool _busy = false;
+  bool _acceptedTerms = false;
   String? _error;
 
   @override
@@ -41,6 +44,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
   }
 
   Future<void> _continue() async {
+    if (_phone.length != 8 || !_acceptedTerms || _busy) return;
     final appState = AppScope.of(context);
     setState(() {
       _busy = true;
@@ -49,7 +53,8 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     try {
       await appState.authRepository.requestOtp('+976$_phone');
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => OtpVerifyScreen(localPhone: _phone)));
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => OtpVerifyScreen(localPhone: _phone)));
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -71,11 +76,16 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.local_shipping_outlined, color: AppColors.accent, size: 36),
+                  Icon(Icons.local_shipping_outlined,
+                      color: AppColors.accent, size: 36),
                   SizedBox(height: 16),
                   Text(
                     Strings.brandTagline,
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.25),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25),
                   ),
                 ],
               ),
@@ -86,9 +96,11 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(Strings.phoneHeading, style: Theme.of(context).textTheme.headlineSmall),
+                    Text(Strings.phoneHeading,
+                        style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: 6),
-                    const Text(Strings.phoneSubtitle, style: TextStyle(color: AppColors.muted, height: 1.4)),
+                    const Text(Strings.phoneSubtitle,
+                        style: TextStyle(color: AppColors.muted, height: 1.4)),
                     const SizedBox(height: 18),
                     Row(
                       children: [
@@ -101,7 +113,8 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                             border: Border.all(color: AppColors.lineStrong),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Text('+976', style: TextStyle(fontWeight: FontWeight.w600)),
+                          child: const Text('+976',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -109,41 +122,82 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                             autofocus: true,
                             keyboardType: TextInputType.phone,
                             textInputAction: TextInputAction.done,
-                            style: const TextStyle(fontWeight: FontWeight.w600, letterSpacing: 1),
-                            decoration: const InputDecoration(hintText: Strings.phoneHint),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, letterSpacing: 1),
+                            decoration: const InputDecoration(
+                                hintText: Strings.phoneHint),
                             controller: _phoneController,
                             onChanged: _onPhoneChanged,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _acceptedTerms
+                            ? AppColors.accentSoft
+                            : AppColors.ground,
+                        border: Border.all(
+                            color: _acceptedTerms
+                                ? AppColors.ink
+                                : AppColors.lineStrong),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                              value: _acceptedTerms,
+                              onChanged: _busy
+                                  ? null
+                                  : (value) => setState(
+                                      () => _acceptedTerms = value ?? false)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(Strings.acceptTerms,
+                                    style: TextStyle(fontSize: 13)),
+                                TextButton(
+                                  onPressed: () => launchUrl(
+                                    Uri.parse(AppConfig.apiBaseUrl)
+                                        .replace(path: '/terms'),
+                                    mode: LaunchMode.externalApplication,
+                                  ),
+                                  child: const Text(Strings.readTerms),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_acceptedTerms)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(Strings.termsRequired,
+                            style: TextStyle(
+                                color: AppColors.muted, fontSize: 12)),
+                      ),
                     ErrorBanner(message: _error),
                     const SizedBox(height: 12),
                     PrimaryButton(
                       label: Strings.phoneContinue,
                       busy: _busy,
-                      onPressed: _phone.length == 8 ? _continue : null,
+                      onPressed: _phone.length == 8 && _acceptedTerms
+                          ? _continue
+                          : null,
                     ),
                     const SizedBox(height: 20),
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: const TextSpan(
-                        style: TextStyle(color: AppColors.muted, fontSize: 13),
-                        children: [
-                          TextSpan(text: Strings.termsPrefix),
-                          TextSpan(
-                            text: Strings.termsLink,
-                            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w600),
-                          ),
-                          TextSpan(text: Strings.termsSuffix),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 12),
                     Center(
                       child: TextButton(
-                        onPressed: () => Navigator.of(context)
-                            .push(MaterialPageRoute(builder: (_) => const PublicTrackingEntryScreen())),
+                        onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const PublicTrackingEntryScreen())),
                         child: const Text(Strings.menuTrackByLink),
                       ),
                     ),

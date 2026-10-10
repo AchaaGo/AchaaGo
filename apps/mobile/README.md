@@ -87,14 +87,14 @@ Every network call goes through `lib/config/app_config.dart` — the single
 place that knows the backend's address:
 
 ```dart
-static const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8187/api');
-static const String wsBaseUrl  = String.fromEnvironment('WS_BASE_URL',  defaultValue: 'ws://10.0.2.2:8187');
+static const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://64.119.31.106:8187/api');
+static const String wsBaseUrl  = String.fromEnvironment('WS_BASE_URL',  defaultValue: 'ws://64.119.31.106:8187');
 ```
 
-The defaults target the Android emulator's alias for your host machine
-(`10.0.2.2`) on the gateway's default port (`WEB_PORT=8187` in the
-repository root `.env`). Override at run/build time for a real device, iOS
-simulator, or a different port:
+The defaults target the current AchaaGo gateway, so an Xcode build on a
+physical iPhone reaches the same backend as the customer web app. Override
+at run/build time for a local development server, another environment, or
+the Android emulator's host alias (`10.0.2.2`):
 
 ```bash
 flutter run \

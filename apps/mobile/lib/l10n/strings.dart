@@ -10,23 +10,30 @@ class Strings {
 
   // Phone login
   static const phoneHeading = 'Утасны дугаараа оруулна уу';
-  static const phoneSubtitle = 'Бид таны дугаарт 4 оронтой баталгаажуулах код илгээнэ.';
+  static const phoneSubtitle = 'Таны утасны дугаараар нэвтрэх код авна.';
   static const phoneHint = '8888 8888';
   static const phoneContinue = 'Үргэлжлүүлэх';
   static const termsPrefix = 'Үргэлжлүүлснээр та ';
   static const termsLink = 'үйлчилгээний нөхцөл';
   static const termsSuffix = '-ийг зөвшөөрнө.';
+  static const acceptTerms = 'Үйлчилгээний нөхцөлийг уншиж, зөвшөөрч байна.';
+  static const readTerms = 'Үйлчилгээний нөхцөл унших';
+  static const termsRequired =
+      'Үргэлжлүүлэхийн өмнө үйлчилгээний нөхцөлийг зөвшөөрнө үү.';
 
   // OTP
   static const otpHeading = 'Кодоо оруулна уу';
-  static String otpSubtitle(String phone) => '+976 $phone дугаарт илгээсэн 4 оронтой кодыг оруулна уу.';
+  static String otpSubtitle(String phone) =>
+      '+976 $phone дугаарт илгээсэн кодыг оруулна уу.';
   static const otpVerify = 'Баталгаажуулах';
   static const otpResend = 'Код дахин илгээх';
-  static String otpResendCountdown(int seconds) => 'Дахин илгээх · $seconds сек';
+  static String otpResendCountdown(int seconds) =>
+      'Дахин илгээх · $seconds сек';
   static const otpDevHint = 'Хөгжүүлэлтийн горимд баталгаажуулах код: 00';
 
   // Customer home
-  static String greeting(String? name) => name == null || name.isEmpty ? 'Сайн байна уу' : 'Сайн байна уу, $name';
+  static String greeting(String? name) =>
+      name == null || name.isEmpty ? 'Сайн байна уу' : 'Сайн байна уу, $name';
   static const homeHeading = 'Юу ачуулах вэ?';
   static const searchPrompt = 'Хаашаа ачих вэ?';
   static const startingPricePrefix = 'Эхлэх үнэ ';
@@ -43,14 +50,18 @@ class Strings {
   static const addLoader = 'Ачигч нэмэх';
   static const payQpay = 'QPay';
   static const payCash = 'Бэлэн мөнгө';
-  static const dropoffRequiredHint = 'Захиалахын тулд хүргэх хаягаа оруулна уу.';
-  static String orderButton(String serviceName, String priceText) => '$serviceName захиалах · $priceText';
+  static const dropoffRequiredHint =
+      'Захиалахын тулд хүргэх хаягаа оруулна уу.';
+  static String orderButton(String serviceName, String priceText) =>
+      '$serviceName захиалах · $priceText';
 
   // Editable pickup (route screen address editing)
   static const searchPickup = 'Авах хаягаа хайх';
   static const searchDestination = 'Хүргэх хаягаа хайх';
+  static const mapSelectedPoint = 'Газрын зураг дээр сонгосон цэг';
   static const useCurrentLocation = 'Одоогийн байршил ашиглах';
-  static const locationFailed = 'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл жагсаалтаас сонгоно уу.';
+  static const locationFailed =
+      'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл жагсаалтаас сонгоно уу.';
   static const needsPickup = 'Авах хаягаа сонгоно уу.';
   static const changeAddress = 'Өөрчлөх';
   static const changePickup = 'Авах хаягийг өөрчлөх';
@@ -58,7 +69,8 @@ class Strings {
 
   // Finding / tracking
   static const findingHeading = 'Жолооч хайж байна…';
-  static String findingSubtitle(String serviceName) => 'Ойролцоох $serviceName жолооч нарт захиалгыг илгээлээ.';
+  static String findingSubtitle(String serviceName) =>
+      'Ойролцоох $serviceName жолооч нарт захиалгыг илгээлээ.';
   static const arrivalPrefix = 'Жолооч ирэх хүртэл';
   static const callDriver = 'Залгах';
   static const messageDriver = 'Мессеж';
@@ -74,7 +86,8 @@ class Strings {
   static const payWithQpayButton = 'QPay төлбөр төлөх';
   static const qpayDemoNotice = 'Туршилтын горимд бодит төлбөр хийгдэхгүй.';
   static const qpayOpenLink = 'QPay нээх';
-  static const orderFoundNoDriver = 'Ойролцоо жолооч олдсонгүй. Дахин оролдоно уу.';
+  static const orderFoundNoDriver =
+      'Ойролцоо жолооч олдсонгүй. Дахин оролдоно уу.';
 
   // Completion / rating
   static const deliveredHeading = 'Ачаа хүргэгдлээ';
@@ -85,16 +98,19 @@ class Strings {
 
   // Public tracking
   static const publicTrackingHeading = 'Захиалгын явц хянах';
-  static const publicTrackingHint = 'Захиалгын хяналтын холбоос эсвэл кодоо оруулна уу';
+  static const publicTrackingHint =
+      'Захиалгын хяналтын холбоос эсвэл кодоо оруулна уу';
   static const publicTrackingOpen = 'Харах';
   static const publicTrackingInvalid = 'Холбоос идэвхгүй байна.';
-  static const publicTrackingPrivacyNote = 'Энэхүү холбоос нь утасны дугаар болон төлбөрийн мэдээлэл харуулахгүй.';
+  static const publicTrackingPrivacyNote =
+      'Энэхүү холбоос нь утасны дугаар болон төлбөрийн мэдээлэл харуулахгүй.';
   static const pickupLabel = 'Авах';
   static const dropoffLabel = 'Хүргэх';
 
   // Driver registration
   static const driverRegisterHeading = 'Жолоочоор бүртгүүлэх';
-  static const driverRegisterSubtitle = 'Мэдээллээ бүрэн бөглөнө үү. Ажилтан баталгаажуулсны дараа захиалга хүлээн авах боломжтой болно.';
+  static const driverRegisterSubtitle =
+      'Мэдээллээ бүрэн бөглөнө үү. Ажилтан баталгаажуулсны дараа захиалга хүлээн авах боломжтой болно.';
   static const driverNameLabel = 'Нэр';
   static const driverLicenseLabel = 'Жолооны үнэмлэхний мэдээлэл';
   static const driverServiceLabel = 'Үйлчилгээний төрөл';
@@ -103,9 +119,11 @@ class Strings {
   static const driverCapacityLabel = 'Даацын багтаамж (кг)';
   static const driverRegisterSubmit = 'Бүртгүүлэх';
   static const driverPendingHeading = 'Бүртгэлийг шалгаж байна';
-  static const driverPendingBody = 'Таны мэдээллийг ажилтан шалгаж байна. Зөвшөөрөгдсөний дараа онлайн болох боломжтой.';
+  static const driverPendingBody =
+      'Таны мэдээллийг ажилтан шалгаж байна. Зөвшөөрөгдсөний дараа онлайн болох боломжтой.';
   static const driverSuspendedHeading = 'Жолоочийн эрх түдгэлзүүлэгдсэн';
-  static const driverSuspendedBody = 'Дэлгэрэнгүй мэдээллийг оператортой холбогдоно уу.';
+  static const driverSuspendedBody =
+      'Дэлгэрэнгүй мэдээллийг оператортой холбогдоно уу.';
 
   // Driver home
   static const driverOnline = 'Онлайн';
@@ -114,9 +132,11 @@ class Strings {
   static const driverGoOffline = 'Оффлайн болох';
   static const driverNoOrder = 'Одоогоор оноогдсон захиалга алга';
   static const driverWaitingForOrder = 'Онлайн байна. Захиалга хүлээж байна…';
-  static const driverOfflinePrompt = 'Захиалга хүлээн авахын тулд онлайн болно уу.';
+  static const driverOfflinePrompt =
+      'Захиалга хүлээн авахын тулд онлайн болно уу.';
   static const driverRatingLabel = 'Үнэлгээ';
-  static const driverLocationPermissionNeeded = 'Онлайн болохын тулд байршил хандах эрх шаардлагатай.';
+  static const driverLocationPermissionNeeded =
+      'Онлайн болохын тулд байршил хандах эрх шаардлагатай.';
 
   // Driver order actions
   static const driverAccept = 'Хүлээж авах';
@@ -124,7 +144,8 @@ class Strings {
   static const driverPickedUp = 'Ачаа авлаа';
   static const driverDelivered = 'Хүргэлээ';
   static const driverConfirmCash = 'Бэлэн мөнгө хүлээн авлаа';
-  static const driverWaitingForQpay = 'Харилцагчийн QPay төлбөрийг хүлээж байна';
+  static const driverWaitingForQpay =
+      'Харилцагчийн QPay төлбөрийг хүлээж байна';
   static const driverCheckPayment = 'Төлбөр шалгах';
   static const driverOrderCompleted = 'Захиалга дууслаа';
   static const driverCustomerLabel = 'Харилцагч';

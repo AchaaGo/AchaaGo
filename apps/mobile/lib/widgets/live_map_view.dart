@@ -30,6 +30,7 @@ class LiveMapView extends StatefulWidget {
     this.pulse = false,
     this.showTruck = false,
     this.myLocationEnabled = false,
+    this.onPick,
   });
 
   final GeoPoint? pickup;
@@ -47,6 +48,9 @@ class LiveMapView extends StatefulWidget {
   /// location that matters, not a marker fetched from the server. Needs the
   /// location permission the app already requests for background updates.
   final bool myLocationEnabled;
+
+  /// Allows the customer to choose a drop-off directly on the map.
+  final ValueChanged<LatLng>? onPick;
 
   @override
   State<LiveMapView> createState() => _LiveMapViewState();
@@ -179,6 +183,7 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       mapToolbarEnabled: false,
+      onTap: widget.onPick,
     );
   }
 }

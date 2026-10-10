@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Colors mirror apps/web's tokens (apps/web/src/app/globals.css :root) so
-/// the mobile app reads as the same product, without pulling in the
-/// branded Google Fonts (Unbounded / Golos Text) the web app uses — that
-/// is a reasonable follow-up once brand font assets are bundled locally.
-/// This is the orange/forest-green palette web switched to; it supersedes
-/// the ink-navy/gold tokens AGENTS.md itself documents.
+/// Shared with the customer web tokens in apps/web/src/app/globals.css.
 class AppColors {
   const AppColors._();
 
-  static const ink = Color(0xFF19231F);
-  static const inkDeep = Color(0xFF183D30);
-  static const ground = Color(0xFFF6F8F5);
+  static const ink = Color(0xFF14213D);
+  static const inkDeep = Color(0xFF0E1830);
+  static const ground = Color(0xFFF4F1EA);
   static const surface = Color(0xFFFFFFFF);
-  static const accent = Color(0xFFE84616);
-  static const accentHover = Color(0xFFCC3B10);
-  static const accentSoft = Color(0xFFFFF7F2);
-  static const line = Color(0xFFDFE4DF);
-  static const lineStrong = Color(0xFFDFE4DF);
-  static const muted = Color(0xFF626B65);
-  static const mint = Color(0xFFB1D6C3);
+  static const accent = Color(0xFFF2A516);
+  static const accentHover = Color(0xFFE69A0A);
+  static const accentSoft = Color(0xFFFFF6E0);
+  static const line = Color(0xFFE2DCCF);
+  static const lineStrong = Color(0xFFCFC7B6);
+  static const muted = Color(0xFF4A5263);
+  static const mint = Color(0xFFF2A516);
   static const error = Color(0xFFB42318);
 }
 
@@ -66,9 +61,9 @@ ThemeData buildAppTheme() {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.accent,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: AppColors.line,
-        disabledForegroundColor: AppColors.muted,
+        foregroundColor: AppColors.ink,
+        disabledBackgroundColor: const Color(0xFFD9D3C6),
+        disabledForegroundColor: const Color(0xFF5E6472),
         minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
@@ -94,17 +89,12 @@ ThemeData buildAppTheme() {
   );
 }
 
-/// The accent button used for the primary call-to-action (order button,
-/// "Баталгаажуулах", etc.). Web's `.btn-accent`/`.btn-primary` both render
-/// identically now (orange background, white text) — AGENTS.md's "text on
-/// accent is always ink" rule was for the old gold accent and no longer
-/// applies to this orange one; kept as a separate style from the theme
-/// default only because call sites already distinguish accent/non-accent.
+/// Accent actions always use ink text, matching web's `.btn-accent`.
 final ButtonStyle accentButtonStyle = ElevatedButton.styleFrom(
   backgroundColor: AppColors.accent,
-  foregroundColor: Colors.white,
-  disabledBackgroundColor: AppColors.line,
-  disabledForegroundColor: AppColors.muted,
+  foregroundColor: AppColors.ink,
+  disabledBackgroundColor: const Color(0xFFD9D3C6),
+  disabledForegroundColor: const Color(0xFF5E6472),
   minimumSize: const Size.fromHeight(52),
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
   textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),

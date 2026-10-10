@@ -4,9 +4,8 @@
 ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8187/api \
 ///               --dart-define=WS_BASE_URL=ws://192.168.1.20:8187
 ///
-/// Defaults target the Android emulator's alias for the host machine
-/// (10.0.2.2), matching the gateway published on WEB_PORT (default 8187)
-/// by docker-compose.yml at the repository root.
+/// Defaults target the same gateway as the customer web app, including on
+/// physical iPhones. Local development can override these with dart-defines.
 class AppConfig {
   const AppConfig._();
 
@@ -14,14 +13,14 @@ class AppConfig {
   /// infra/nginx.conf: `location /api/ { proxy_pass http://api:8000/; }`).
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8187/api',
+    defaultValue: 'http://64.119.31.106:8187/api',
   );
 
   /// WebSocket origin. Order/tracking sockets live at the gateway root
   /// (`/ws/...`), not under `/api`, so this is a separate value.
   static const String wsBaseUrl = String.fromEnvironment(
     'WS_BASE_URL',
-    defaultValue: 'ws://10.0.2.2:8187',
+    defaultValue: 'ws://64.119.31.106:8187',
   );
 
   static const String brandName = String.fromEnvironment(
