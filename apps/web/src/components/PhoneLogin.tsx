@@ -7,6 +7,10 @@ import {customerCopy as copy} from './customerCopy';
 
 // Remember the last number so returning customers (most order once or twice a year) skip retyping it.
 const PHONE_KEY = 'achaago.phone';
+// Real SMS codes have 4 digits. The fixed "00" test code only works while the server runs the
+// console (demo) SMS provider, which /api/config reports as dev_otp.
+const DEV_CODE = '00';
+const codeComplete = (value:string, devOtp:boolean) => value.length === 4 || (devOtp && value === DEV_CODE);
 function remembered() { try { return typeof window === 'undefined' ? '' : (localStorage.getItem(PHONE_KEY) || '').replace(/\D/g,'').slice(0,8); } catch { return ''; } }
 
 export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<void>;heading?:string}) {
@@ -14,6 +18,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
   const [phone, setPhone] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [code, setCode] = useState('');
+  const [devOtp, setDevOtp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [seconds, setSeconds] = useState(0);
@@ -24,6 +29,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     return () => clearInterval(id);
   }, [seconds]);
   useEffect(() => { setPhone(current => current || remembered()); }, []);
+  useEffect(() => { api<{dev_otp?:boolean}>('/config').then(config => setDevOtp(!!config.dev_otp)).catch(() => {}); }, []);
   useEffect(() => { if (step === 'code' && !busy) codeInput.current?.focus(); }, [step, busy]);
 
   async function request() {
@@ -36,8 +42,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     finally { setBusy(false); }
   }
   async function verify(value = code) {
-    // Preserve the existing two-digit test OTP contract.
-    if (busy || value.length !== 2) return;
+    if (busy || !codeComplete(value, devOtp)) return;
     setBusy(true); setError('');
     try {
       const result = await api<{user:any}>('/auth/otp/verify', {method:'POST', body:JSON.stringify({phone:'+976'+phone, code:value})});
@@ -52,11 +57,11 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     <div><h1 className="display">Кодоо оруулна уу</h1><p className="muted">+976 {phoneFmt(phone)} дугаарт илгээсэн кодыг оруулна уу.</p></div>
     <form className="auth-form" onSubmit={e => {e.preventDefault(); void verify();}} aria-busy={busy}>
       <label className="field-label" htmlFor="otp">Баталгаажуулах код</label>
-      <input ref={codeInput} id="otp" className="field otp-field" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={2} value={code} disabled={busy} onChange={e => {const next = e.target.value.replace(/\D/g,'').slice(0,2); setCode(next); setError(''); if (next.length === 2) void verify(next);}} placeholder="00" aria-describedby={error ? 'otp-help auth-error' : 'otp-help'} aria-invalid={!!error}/>
-      <p id="otp-help" className="field-help">{copy.codeHelp}</p>
+      <input ref={codeInput} id="otp" className="field otp-field" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={4} value={code} disabled={busy} onChange={e => {const next = e.target.value.replace(/\D/g,'').slice(0,4); setCode(next); setError(''); if (codeComplete(next, devOtp)) void verify(next);}} placeholder={devOtp ? DEV_CODE : '0000'} aria-describedby={error ? 'otp-help auth-error' : 'otp-help'} aria-invalid={!!error}/>
+      <p id="otp-help" className="field-help">{devOtp ? copy.codeHelpDemo : copy.codeHelp}</p>
       {error && <p id="auth-error" className="error" role="alert">{error}</p>}
       <button type="button" className="text-button resend-button" onClick={request} disabled={seconds > 0 || busy}>{seconds ? `Дахин илгээх · ${seconds} сек` : 'Код дахин илгээх'}</button>
-      <button className="btn btn-primary" disabled={code.length !== 2 || busy}>{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.verifyCode : 'Баталгаажуулах'}</button>
+      <button className="btn btn-primary" disabled={!codeComplete(code, devOtp) || busy}>{busy && <span className="spinner" aria-hidden="true"/>}{busy ? copy.verifyCode : 'Баталгаажуулах'}</button>
       <span className="sr-only" role="status">{busy ? copy.loading : ''}</span>
     </form>
   </main>;

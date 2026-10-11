@@ -13,7 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 import httpx
 from redis.exceptions import RedisError
-from . import cache
+from . import alerts, cache
 from .config import settings
 from .db import Session, engine, get_db, get_locked
 from .models import Driver, Order, OrderEvent, Outbox, Payment, PricingSettings, RefreshSession, Service, User, Vehicle, IS_POSTGRES, now, point_value
@@ -23,14 +23,40 @@ from .providers import distance_km, maps_provider, payment_provider
 from .schemas import (AssignInput, CancelInput, DriverApproval, DriverLocation, DriverRegistration, InvoiceInput, OrderInput,
                       OTPVerify, Phone, PhoneOrder, PricingInput, PushToken, QuoteInput, RatingInput, RefreshInput, ServiceInput, StatusInput)
 from .security import admin, current_user, decode, digest, find_user, issue_tokens, staff, user_json
-from .workers import send_sms
+from .workers import HEARTBEAT_KEY, send_sms
 
 log = logging.getLogger(__name__)
+alerts.install(settings.alert_provider, settings.telegram_bot_token, settings.telegram_chat_id,
+               f"{settings.brand_name} {settings.app_env} API")
+WORKER_STALE_SECONDS = 180
+
+
+async def worker_age() -> float | None:
+    """Seconds since the background worker last drained the outbox; None if never seen."""
+    beat = await cache.redis.get(HEARTBEAT_KEY)
+    return now().timestamp() - float(beat) if beat else None
+
+
+async def watch_worker():
+    # With the worker or beat down, no SMS, push or live order update goes out,
+    # and nothing else would notice. Alerts are rate-limited by app.alerts.
+    await asyncio.sleep(WORKER_STALE_SECONDS)  # let a fresh deployment's worker start first
+    while True:
+        try:
+            age = await worker_age()
+            if age is None or age > WORKER_STALE_SECONDS:
+                log.error("Background worker heartbeat is stale; SMS, push and live updates are not being sent")
+        except Exception as error:
+            log.warning("Worker watchdog check failed (%s)", type(error).__name__)
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
 async def lifespan(app):
+    watchdog = asyncio.create_task(watch_worker()) if settings.alert_provider != "console" else None
     yield
+    if watchdog:
+        watchdog.cancel()
     await cache.redis.aclose()
     await engine.dispose()
 
@@ -77,6 +103,13 @@ async def cache_error(request, exc):
     return JSONResponse({"detail": "SERVICE_UNAVAILABLE"}, status_code=503)
 
 
+@app.exception_handler(Exception)
+async def unexpected_error(request, exc):
+    # Path only: query strings can carry tokens. Logged at ERROR, so app.alerts reports it.
+    log.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse({"detail": "SERVER_ERROR"}, status_code=500)
+
+
 @app.get("/health")
 async def health(db: DB):
     await db.execute(text("SELECT 1"))
@@ -84,10 +117,32 @@ async def health(db: DB):
     return {"status": "ok"}
 
 
+@app.get("/health/full")
+async def health_full(db: DB):
+    """For an external uptime monitor: also fails while the background worker is down.
+    (/health stays liveness-only: Docker gates startup on it, before the worker runs.)"""
+    checks = {}
+    for name, probe in (("database", lambda: db.execute(text("SELECT 1"))), ("redis", cache.redis.ping)):
+        try:
+            await probe()
+            checks[name] = "ok"
+        except Exception as error:
+            checks[name] = "down: " + type(error).__name__
+    try:
+        age = await worker_age()
+        checks["worker"] = "ok" if age is not None and age <= WORKER_STALE_SECONDS else "stale"
+    except Exception as error:
+        checks["worker"] = "down: " + type(error).__name__
+    healthy = all(value == "ok" for value in checks.values())
+    return JSONResponse({"status": "ok" if healthy else "degraded", "checks": checks}, status_code=200 if healthy else 503)
+
+
 @app.get("/config")
 async def config():
     return {"brand_name": settings.brand_name, "demo": settings.app_env != "production",
             "maps_provider": settings.maps_provider, "qpay_provider": settings.qpay_provider,
+            # The fixed "00" login code only works with the console SMS provider (see otp_verify).
+            "dev_otp": settings.sms_provider == "console",
             "customer_cancel_statuses": settings.customer_cancel_statuses.split(",")}
 
 

@@ -6,6 +6,7 @@ from decimal import Decimal
 import httpx
 from fastapi import HTTPException
 from .config import settings
+from .sms import fill_json, fill_url, format_phone, mask_phone
 
 log = logging.getLogger(__name__)
 
@@ -22,8 +23,41 @@ class ConsoleSmsProvider(SmsProvider):
         log.warning("DEVELOPMENT SMS to %s: %s", phone, message)
 
 
+class HttpSmsProvider(SmsProvider):
+    """Any HTTP SMS gateway, described entirely by the SMS_HTTP_* settings.
+
+    Raising on failure is the contract: the Celery task and the outbox both
+    retry. Errors never include the URL or body, which carry the API key and,
+    for OTPs, the code itself.
+    """
+
+    def __init__(self, client: httpx.Client | None = None):
+        self.client = client
+
+    def send(self, phone, message):
+        values = {"phone": format_phone(phone, settings.sms_phone_format), "message": message,
+                  "sender": settings.sms_sender, "api_key": settings.sms_api_key}
+        headers = {key: str(value) for key, value in fill_json(settings.sms_http_headers or "{}", values).items()}
+        options = {}
+        if settings.sms_http_method == "POST" and settings.sms_http_body:
+            options["json" if settings.sms_http_body_format == "json" else "data"] = fill_json(settings.sms_http_body, values)
+        client = self.client or httpx.Client(timeout=10)
+        try:
+            response = client.request(settings.sms_http_method, fill_url(settings.sms_http_url, values),
+                                      headers=headers, **options)
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"SMS gateway unreachable ({type(error).__name__})") from None
+        finally:
+            if self.client is None:
+                client.close()
+        if not 200 <= response.status_code < 300 or (
+                settings.sms_http_success_text and settings.sms_http_success_text not in response.text):
+            raise RuntimeError(f"SMS gateway rejected the message to {mask_phone(phone)} (HTTP {response.status_code})")
+        log.info("SMS sent to %s", mask_phone(phone))
+
+
 def sms_provider() -> SmsProvider:
-    return ConsoleSmsProvider()
+    return HttpSmsProvider() if settings.sms_provider == "http" else ConsoleSmsProvider()
 
 
 @dataclass
