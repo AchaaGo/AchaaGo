@@ -12,9 +12,10 @@ import '../../widgets/error_banner.dart';
 import '../../widgets/primary_button.dart';
 import '../shared/role_gate_screen.dart';
 
-/// Screen 2 in AGENTS.md. The backend only accepts a real SMS code in
-/// production; in this development build (SMS_PROVIDER=console) the
-/// working shortcut code is AppConfig.devOtpCode.
+/// Screen 2 in AGENTS.md. A complete 4-digit code submits itself (iOS also
+/// offers it from Messages). The shortcut code AppConfig.devOtpCode and its
+/// hint exist only while the server runs SMS_PROVIDER=console, same as the
+/// web login.
 class OtpVerifyScreen extends StatefulWidget {
   const OtpVerifyScreen({super.key, required this.localPhone});
 
@@ -28,6 +29,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   final _codeController = TextEditingController();
   String _code = '';
   bool _busy = false;
+  bool _devOtp = false;
   String? _error;
   int _secondsLeft = 60;
   Timer? _timer;
@@ -36,6 +38,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   void initState() {
     super.initState();
     _startCountdown();
+    AppScope.read(context).authRepository.devOtpEnabled().then((enabled) {
+      if (mounted && enabled) setState(() => _devOtp = true);
+    });
   }
 
   @override
@@ -99,6 +104,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       );
     }
     setState(() => _code = digits);
+    if (digits.length == 4 && !_busy) _verify();
   }
 
   @override
@@ -124,14 +130,16 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 maxLength: 4,
+                autofillHints: const [AutofillHints.oneTimeCode],
                 style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: 18),
                 decoration: const InputDecoration(counterText: '', hintText: '····'),
                 onChanged: _onCodeChanged,
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text(Strings.otpDevHint, style: TextStyle(color: AppColors.muted, fontSize: 12)),
-              ),
+              if (_devOtp)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(Strings.otpDevHint, style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                ),
               ErrorBanner(message: _error),
               const SizedBox(height: 8),
               Align(
@@ -142,7 +150,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              PrimaryButton(label: Strings.otpVerify, busy: _busy, onPressed: _code.length == 4 || _code == AppConfig.devOtpCode ? _verify : null),
+              PrimaryButton(label: Strings.otpVerify, busy: _busy, onPressed: _code.length == 4 || (_devOtp && _code == AppConfig.devOtpCode) ? _verify : null),
             ],
           ),
         ),

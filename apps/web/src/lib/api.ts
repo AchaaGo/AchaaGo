@@ -49,11 +49,15 @@ export async function api<T>(path:string, init:RequestInit = {}):Promise<T> {
     result = await request('/api'+path, init, timeout);
   } catch (error) {
     // Reads are safe to repeat: one quiet retry rides out a dropped mobile connection.
-    if (method !== 'GET') throw error;
+    // Not after a timeout, which already kept the customer waiting 15 s.
+    if (method !== 'GET' || (error as ApiError).code !== 'NETWORK') throw error;
     await new Promise(resolve => setTimeout(resolve, 800));
     result = await request('/api'+path, init, timeout);
   }
-  if (result.status === 401 && !path.startsWith('/auth/') && (result.body.detail === 'SESSION_EXPIRED' || result.body.detail === 'LOGIN_REQUIRED')) {
+  // Every page load checks the session with /auth/me after the browser has dropped the
+  // 15-minute access cookie, so that call renews too. Only the login calls answer for themselves.
+  const renewable = !path.startsWith('/auth/otp/') && path !== '/auth/refresh';
+  if (result.status === 401 && renewable && (result.body.detail === 'SESSION_EXPIRED' || result.body.detail === 'LOGIN_REQUIRED')) {
     // The server rejected the request before running it, so repeating it after a refresh
     // is safe (POST /orders also carries its Idempotency-Key).
     const outcome = await refreshSession();

@@ -8,6 +8,7 @@ import 'package:achaago_mobile/screens/login/otp_verify_screen.dart';
 import 'package:achaago_mobile/state/app_scope.dart';
 import 'package:achaago_mobile/state/app_state.dart';
 import 'package:achaago_mobile/widgets/loading_view.dart';
+import 'package:achaago_mobile/widgets/primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +32,9 @@ void main() {
           final client = MockClient((request) async {
             final path = request.url.path;
             requests.add(path);
+            if (path.endsWith('/config')) {
+              return http.Response(jsonEncode({'dev_otp': true}), 200);
+            }
             if (path.endsWith('/auth/otp/verify')) {
               expect(jsonDecode(request.body), {
                 'phone': '+97699112233',
@@ -100,6 +104,8 @@ void main() {
               ),
             ),
           );
+          await tester.pump();
+          expect(find.text(Strings.otpDevHint), findsOneWidget);
           await tester.enterText(find.byType(TextField), '00');
           await tester.pump();
           await tester.tap(find.text(Strings.otpVerify));
@@ -140,5 +146,45 @@ void main() {
         },
       );
     }
+  }
+
+  for (final config in ['real-sms', 'unreachable']) {
+    testWidgets('with $config config there is no test code and 4 digits submit themselves', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final store = SessionStore();
+      final codes = <String>[];
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/config')) {
+          return config == 'real-sms'
+              ? http.Response(jsonEncode({'dev_otp': false}), 200)
+              : http.Response('{"detail":"SERVICE_UNAVAILABLE"}', 503);
+        }
+        if (request.url.path.endsWith('/auth/otp/verify')) {
+          codes.add((jsonDecode(request.body) as Map<String, dynamic>)['code'] as String);
+          return http.Response('{"detail":"OTP_INVALID"}', 400);
+        }
+        fail('Unexpected request: ${request.url.path}');
+      });
+      final state = AppState(api: ApiClient(client: client, sessionStore: store), sessionStore: store);
+      addTearDown(client.close);
+      addTearDown(state.dispose);
+      await tester.pumpWidget(
+        AppScope(state: state, child: const MaterialApp(home: OtpVerifyScreen(localPhone: '99112233'))),
+      );
+      await tester.pump();
+
+      expect(find.text(Strings.otpDevHint), findsNothing);
+      await tester.enterText(find.byType(TextField), '00');
+      await tester.pump();
+      expect(tester.widget<PrimaryButton>(find.byType(PrimaryButton)).onPressed, isNull);
+      expect(codes, isEmpty);
+
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.pump();
+      await tester.pump();
+      expect(codes, ['1234']);
+      expect(find.text(describeError('OTP_INVALID')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 }

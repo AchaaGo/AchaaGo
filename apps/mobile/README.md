@@ -125,7 +125,8 @@ unlike the Android emulator it shares the host's network namespace.)
 While the backend runs with `SMS_PROVIDER=console`, it prints the real
 4-digit code to the API/worker logs and also accepts the shortcut code
 **`00`** (`services/api/app/main.py otp_verify`). The verification screen
-shows this hint under the code field.
+shows this hint under the code field only while `GET /config` reports
+`dev_otp: true`; with a real SMS gateway the hint and the shortcut disappear.
 
 ## Running
 

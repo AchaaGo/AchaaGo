@@ -34,6 +34,18 @@ class AuthRepository {
     return AuthResult(accessToken, refreshToken, user);
   }
 
+  /// Whether the server prints codes instead of sending SMS (`dev_otp` in
+  /// GET /config), so the fixed test code works. Any failure counts as no:
+  /// a real customer must never be told to type a test code.
+  Future<bool> devOtpEnabled() async {
+    try {
+      final json = await _api.get('/config', auth: false);
+      return json is Map<String, dynamic> && json['dev_otp'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<AppUser> me() async {
     final json = await _api.get('/auth/me') as Map<String, dynamic>;
     return AppUser.fromJson(json);
