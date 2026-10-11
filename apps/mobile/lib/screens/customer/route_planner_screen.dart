@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/formatting.dart';
+import '../../core/search_revision.dart';
 import '../../l10n/strings.dart';
 import '../../models/point.dart';
 import '../../models/quote.dart';
@@ -39,6 +40,9 @@ class RoutePlannerScreen extends StatefulWidget {
 class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
+  final _searchRevision = SearchRevision();
+  bool _searching = false;
+  bool _searched = false;
 
   final _searchFocusNode = FocusNode();
 
@@ -71,6 +75,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchRevision.next();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -104,24 +109,42 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   }
 
   void _onSearchChanged(String value) {
+    final query = value.trim();
+    final revision = _searchRevision.next();
+    _debounce?.cancel();
     setState(() {
       _quote = null;
       _suggestions = const [];
+      _searching = query.length >= 3;
+      _searched = false;
+      _error = null;
       if (_editingTarget == 'pickup') {
         _pickupPending = true;
       } else {
         _dropoff = null;
       }
     });
-    _debounce?.cancel();
-    if (value.trim().length < 2) return;
-    _debounce = Timer(const Duration(milliseconds: 250), () async {
+    if (query.length < 3) return;
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      if (!mounted || !_searchRevision.isCurrent(revision)) return;
       final appState = AppScope.of(context);
       try {
-        final results = await appState.customerRepository.searchPlaces(value);
-        if (mounted) setState(() => _suggestions = results);
+        final results = await appState.customerRepository.searchPlaces(query);
+        if (mounted && _searchRevision.isCurrent(revision)) {
+          setState(() {
+            _suggestions = results;
+            _searching = false;
+            _searched = true;
+          });
+        }
       } on ApiException catch (e) {
-        if (mounted) setState(() => _error = e.message);
+        if (mounted && _searchRevision.isCurrent(revision)) {
+          setState(() {
+            _error = e.message;
+            _searching = false;
+            _searched = true;
+          });
+        }
       }
     });
   }
@@ -132,9 +155,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   void _startEditing(String target) {
     if (_busy) return;
     _debounce?.cancel();
+    _searchRevision.next();
     setState(() {
       _editingTarget = target;
       _suggestions = const [];
+      _searching = false;
+      _searched = false;
       _error = null;
       _searchController.text = target == 'pickup'
           ? (_pickup.address == Strings.currentLocation ? '' : _pickup.address)
@@ -144,6 +170,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   }
 
   Future<void> _pickPlace(PlaceSuggestion suggestion) async {
+    _debounce?.cancel();
+    _searchRevision.next();
     final appState = AppScope.of(context);
     setState(() {
       _busy = true;
@@ -151,6 +179,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     });
     try {
       final place = await appState.customerRepository.place(suggestion.id);
+      if (!mounted) return;
       setState(() {
         if (_editingTarget == 'pickup') {
           _pickup = place;
@@ -160,7 +189,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         }
         _searchController.text = place.address;
         _suggestions = const [];
+        _searching = false;
+        _searched = false;
       });
+      _searchFocusNode.unfocus();
       await _requote(appState);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -172,10 +204,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   Future<void> _pickOnMap(LatLng location) async {
     if (_busy) return;
     _debounce?.cancel();
+    _searchRevision.next();
     _searchFocusNode.unfocus();
     setState(() {
       _editingTarget = 'dropoff';
       _suggestions = const [];
+      _searching = false;
+      _searched = false;
       _dropoff = GeoPoint(
         lat: location.latitude,
         lng: location.longitude,
@@ -321,51 +356,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             showRoute: !_pickupPending && _dropoff != null,
             onPick: _pickOnMap,
           ),
+          header: _buildRouteHeader(),
           children: [
-            Row(
-              children: [
-                IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back)),
-                const SizedBox(width: 4),
-                Expanded(
-                    child: Text(Strings.chooseVehicle,
-                        style: Theme.of(context).textTheme.titleLarge)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _buildAddressField(
-                target: 'pickup', dot: true, hint: Strings.searchPickup),
-            if (_editingTarget == 'pickup')
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _busy ? null : _useCurrentLocationForPickup,
-                  style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero, minimumSize: const Size(0, 44)),
-                  child: const Text(Strings.useCurrentLocation,
-                      style:
-                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
-              ),
-            const SizedBox(height: 10),
-            _buildAddressField(
-                target: 'dropoff', dot: false, hint: Strings.searchDestination),
-            if (_suggestions.isNotEmpty)
-              Card(
-                margin: const EdgeInsets.only(top: 6),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _suggestions
-                      .map((s) => ListTile(
-                            leading: const Icon(Icons.place_outlined),
-                            title: Text(s.address),
-                            onTap: () => _pickPlace(s),
-                          ))
-                      .toList(),
-                ),
-              ),
-            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -447,6 +439,109 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     );
   }
 
+  Widget _buildRouteHeader() {
+    final editingPickup = _editingTarget == 'pickup';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      color: AppColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Буцах',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(Strings.searchPrompt,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const Text(Strings.routeSearchHelp,
+                      style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                ])),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+                child: _AddressTab(
+                    label: Strings.pickupTab,
+                    selected: editingPickup,
+                    onTap: () => _startEditing('pickup'))),
+            const SizedBox(width: 10),
+            Expanded(
+                child: _AddressTab(
+                    label: Strings.dropoffTab,
+                    selected: !editingPickup,
+                    onTap: () => _startEditing('dropoff'))),
+          ]),
+          const SizedBox(height: 12),
+          _buildAddressField(
+            target: _editingTarget,
+            dot: editingPickup,
+            hint: editingPickup
+                ? Strings.searchPickup
+                : Strings.searchDestination,
+          ),
+          if (editingPickup)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _busy ? null : _useCurrentLocationForPickup,
+                child: const Text(Strings.useCurrentLocation),
+              ),
+            ),
+          if (_searching)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Row(children: [
+                SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 10),
+                Text(Strings.searchPlacesLoading),
+              ]),
+            ),
+          if (_suggestions.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.only(top: 6),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (context, index) {
+                    final suggestion = _suggestions[index];
+                    return ListTile(
+                      leading: const Icon(Icons.place_outlined),
+                      title: Text(suggestion.address),
+                      onTap: _busy ? null : () => _pickPlace(suggestion),
+                    );
+                  },
+                ),
+              ),
+            ),
+          if (_searched &&
+              !_searching &&
+              _suggestions.isEmpty &&
+              _error == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Text(Strings.searchPlacesEmpty,
+                  style: TextStyle(color: AppColors.muted)),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAddressField(
       {required String target, required bool dot, required String hint}) {
     if (_editingTarget == target) {
@@ -455,8 +550,23 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         child: TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,
+          enabled: !_busy,
           onChanged: _onSearchChanged,
-          decoration: InputDecoration(hintText: hint, isDense: true),
+          decoration: InputDecoration(
+            hintText: hint,
+            isDense: true,
+            suffixIcon: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Хаяг арилгах',
+                    onPressed: () {
+                      _searchController.clear();
+                      _onSearchChanged('');
+                      _searchFocusNode.requestFocus();
+                    },
+                  ),
+          ),
         ),
       );
     }
@@ -509,6 +619,30 @@ class _AddressRow extends StatelessWidget {
     return Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [marker, const SizedBox(width: 10), Expanded(child: child)]);
+  }
+}
+
+class _AddressTab extends StatelessWidget {
+  const _AddressTab(
+      {required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        backgroundColor: selected ? AppColors.accentSoft : AppColors.surface,
+        side: BorderSide(
+            color: selected ? AppColors.accent : AppColors.line,
+            width: selected ? 2 : 1),
+      ),
+      child: Text(label, textAlign: TextAlign.center),
+    );
   }
 }
 

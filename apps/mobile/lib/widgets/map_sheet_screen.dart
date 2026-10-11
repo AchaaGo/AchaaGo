@@ -14,14 +14,46 @@ class MapSheetScreen extends StatelessWidget {
     required this.background,
     required this.children,
     this.backgroundHeight = 200,
+    this.header,
   });
 
   final Widget background;
   final List<Widget> children;
   final double backgroundHeight;
+  final Widget? header;
 
   @override
   Widget build(BuildContext context) {
+    if (header != null) {
+      return SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header!,
+            SizedBox(height: backgroundHeight, child: background),
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Color(0x2414213D),
+                      blurRadius: 28,
+                      offset: Offset(0, -8))
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -34,7 +66,9 @@ class MapSheetScreen extends StatelessWidget {
             ),
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children),
             ),
           ),
         ),

@@ -36,6 +36,10 @@ class Strings {
       name == null || name.isEmpty ? 'Сайн байна уу' : 'Сайн байна уу, $name';
   static const homeHeading = 'Юу ачуулах вэ?';
   static const searchPrompt = 'Хаашаа ачих вэ?';
+  static const routeSearchHelp =
+      'Хүргэх хаягаа хайх эсвэл газрын зураг дээр сонгоно уу.';
+  static const pickupTab = 'Авах газар';
+  static const dropoffTab = 'Хүргэх газар';
   static const startingPricePrefix = 'Эхлэх үнэ ';
   static const menuCurrentOrder = 'Идэвхтэй захиалга';
   static const menuBecomeDriver = 'Жолооч болох';
@@ -59,6 +63,10 @@ class Strings {
   static const searchPickup = 'Авах хаягаа хайх';
   static const searchDestination = 'Хүргэх хаягаа хайх';
   static const mapSelectedPoint = 'Газрын зураг дээр сонгосон цэг';
+  static const searchPlacesLoading = 'Хайж байна…';
+  static const searchPlacesEmpty = 'Илэрц олдсонгүй. Өөр нэрээр хайна уу.';
+  static const searchPlacesShort =
+      'Хаягийн нэрээс 3-аас дээш тэмдэгт бичнэ үү.';
   static const useCurrentLocation = 'Одоогийн байршил ашиглах';
   static const locationFailed =
       'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл жагсаалтаас сонгоно уу.';

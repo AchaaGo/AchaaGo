@@ -83,6 +83,21 @@ it before going online.
 
 ## Configuring the API base URL
 
+### Real address suggestions and road routes
+
+The customer route screen searches as the customer types, lets them choose
+pickup or destination, and requests a fresh route and price after a place is
+selected. The mobile app calls AchaaGo's `/places`, `/places/{id}`, and
+`/quotes` endpoints; it does not embed a web-browser Google API key.
+
+For real Google place names and a road-following route, the **API server**
+must use `MAPS_PROVIDER=google` and a server-side `GOOGLE_MAPS_API_KEY` with
+Places API (New) and Routes API enabled. Keep that key only in the server's
+untracked environment, not in Flutter or Git. With `MAPS_PROVIDER=demo`,
+search is limited to the six demo landmarks and the map shows an approximate
+straight line instead of a road polyline. The mobile search remains usable,
+but that demo behavior is not a live Google integration.
+
 Every network call goes through `lib/config/app_config.dart` — the single
 place that knows the backend's address:
 
