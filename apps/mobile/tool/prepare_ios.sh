@@ -25,6 +25,11 @@ if ! grep -q NSLocationWhenInUseUsageDescription "$plist"; then
 fi
 grep -q NSLocationWhenInUseUsageDescription "$plist" || { echo "prepare_ios.sh: Info.plist location-permission edit didn't take (template changed?)" >&2; exit 1; }
 
+# Home-screen name: flutter create derives "Achaago Mobile" from the package
+# name. Match the Android label set in prepare_android.sh.
+perl -0pi -e 's#(<key>CFBundleDisplayName</key>\s*<string>)[^<]*(</string>)#${1}AchaaGo${2}#' "$plist"
+grep -q "<string>AchaaGo</string>" "$plist" || { echo "prepare_ios.sh: Info.plist display-name edit didn't take (template changed?)" >&2; exit 1; }
+
 # The server is plain HTTP until it gets a domain + HTTPS — the iOS
 # counterpart of usesCleartextTraffic in prepare_android.sh. Remove both
 # together. (Dart's own HTTP client may not be subject to App Transport
@@ -51,6 +56,10 @@ if ! grep -q "import GoogleMaps" "$appdelegate"; then
 fi
 if ! grep -q "GMSServices.provideAPIKey" "$appdelegate"; then
   perl -0pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_IOS} || "NO_IOS_MAPS_KEY_CONFIGURED"; s#(GeneratedPluginRegistrant\.register\(with: [^)]*\))#GMSServices.provideAPIKey("$key")\n    $1#' "$appdelegate"
+elif [ -n "${GOOGLE_MAPS_API_KEY_IOS:-}" ]; then
+  # Re-running with a key on an already-generated project must replace the
+  # old one (often the placeholder); skipping here used to leave the map blank.
+  perl -pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_IOS}; s#GMSServices\.provideAPIKey\("[^"]*"\)#GMSServices.provideAPIKey("$key")#' "$appdelegate"
 fi
 grep -q "import GoogleMaps" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's GoogleMaps import didn't take (template changed?). Current content:" >&2; cat "$appdelegate" >&2; exit 1; }
 grep -q "GMSServices.provideAPIKey" "$appdelegate" || { echo "prepare_ios.sh: AppDelegate.swift's provideAPIKey call didn't take (template changed?). Current content:" >&2; cat "$appdelegate" >&2; exit 1; }

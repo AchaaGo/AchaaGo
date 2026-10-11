@@ -301,11 +301,13 @@ apps", or "iOS apps", never more than one:
    — Apple's device/simulator signing isn't tied to a fingerprint baked
    into a Maps key restriction the way Android's is.
 
-Running locally: export `GOOGLE_MAPS_API_KEY_IOS` before
-`./tool/prepare_ios.sh`. Without one the script bakes in an obviously
-invalid placeholder key, so the map should come up blank rather than the
-app failing — unconfirmed on a real run. If a map screen crashes on iOS
-with no key configured, that's the first thing to look at.
+Running locally: `GOOGLE_MAPS_API_KEY_IOS=<key> ./tool/prepare_ios.sh`
+sets the key, and re-running it with a different key replaces the old one
+(so does `prepare_android.sh` for `GOOGLE_MAPS_API_KEY_ANDROID`). Without a
+key the script bakes in an obviously invalid placeholder: the app runs and
+the map stays blank (confirmed on an iPhone). The console then shows
+"Client authentication failed" or "cannot connect or validate APIKey" —
+check that the key is the iOS-restricted one with Maps SDK for iOS allowed.
 
 ## Design notes / deliberate limitations
 

@@ -27,6 +27,9 @@ perl -pi -e 's#android:label="[^"]*"#android:label="AchaaGo"#' "$manifest"
 # write that literal text into the manifest instead of the real key.
 if ! grep -q com.google.android.geo.API_KEY "$manifest"; then
   perl -0pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_ANDROID} // ""; s#</application>#    <meta-data android:name="com.google.android.geo.API_KEY" android:value="$key"/>\n    </application>#' "$manifest"
+elif [ -n "${GOOGLE_MAPS_API_KEY_ANDROID:-}" ]; then
+  # Re-running with a key must replace the old (often empty) value, not skip it.
+  perl -pi -e 'my $key = $ENV{GOOGLE_MAPS_API_KEY_ANDROID}; s#(android:name="com\.google\.android\.geo\.API_KEY" android:value=")[^"]*"#${1}$key"#' "$manifest"
 fi
 
 # A fixed debug-signing keystore so the app's SHA-1 fingerprint is the same

@@ -13,6 +13,10 @@ type PlaceRow = {id:string; address:string; source:'google'|'demo'; place?:unkno
 
 type Screen='loading'|'login'|'home'|'route'|'finding'|'tracking'|'complete';
 const fallback:Point={lat:47.9186,lng:106.9177,address:'Одоогийн байршил'};
+// Mirrors ACTIVE in services/api/app/pricing.py: the server refuses a new
+// order while one of these exists, so the app must always lead back to it.
+const ACTIVE_STATUSES=['pending','assigned','driver_arriving','arrived','picked_up','delivered'];
+const latestActive=(orders:Order[])=>orders[0]&&ACTIVE_STATUSES.includes(orders[0].status)?orders[0]:null;
 
 function customerError(error:unknown) { return error instanceof ApiError ? error.message : copy.error; }
 
@@ -32,7 +36,7 @@ export function CustomerFlow() {
   const [quote,setQuote]=useState<Quote|null>(null), [loaders,setLoaders]=useState(0), [pay,setPay]=useState<'cash'|'qpay'>('qpay');
   const [order,setOrder]=useState<Order|null>(null), [busy,setBusy]=useState(false), [error,setError]=useState(''), [user,setUser]=useState<any>(null), [qpay,setQpay]=useState<any>(null);
   const [disconnected,setDisconnected]=useState(false);
-  const socket=useRef<WebSocket|null>(null), searchTimer=useRef<ReturnType<typeof setTimeout>|null>(null), reconnectTimer=useRef<ReturnType<typeof setTimeout>|null>(null), orderDone=useRef(false);
+  const socket=useRef<WebSocket|null>(null), searchTimer=useRef<ReturnType<typeof setTimeout>|null>(null), reconnectTimer=useRef<ReturnType<typeof setTimeout>|null>(null), orderDone=useRef(false), lastStatus=useRef('');
   const staleGuard=useRef(createStaleGuard()).current, sessionToken=useRef<google.maps.places.AutocompleteSessionToken|null>(null);
   const [searched,setSearched]=useState(false), [notice,setNotice]=useState(''), [ordering,setOrdering]=useState(false);
   const searchInput=useRef<HTMLInputElement>(null);
@@ -40,11 +44,15 @@ export function CustomerFlow() {
   function updatePlaces(rows:PlaceRow[]){setPlaces(rows);setHighlight(-1)}
   const selectedPrice=quote?.prices.find(p=>p.service.id===selected);
 
-  async function boot(){setError('');try{const [me,svcs]=await Promise.all([api<any>('/auth/me'),api<Service[]>('/services')]);setUser(me);setServices(svcs);setSelected(svcs.find(s=>s.code==='porter')?.id||svcs[0]?.id||'');setScreen('home');navigator.geolocation?.getCurrentPosition(pos=>setPickup({...fallback,lat:pos.coords.latitude,lng:pos.coords.longitude}),()=>{}, {timeout:5000,maximumAge:300000})}catch(e){if((e as ApiError).status===401)setScreen('login');else{setError(customerError(e));setScreen('loading')}}}
+  function enter(svcs:Service[],orders:Order[]){setServices(svcs);setSelected(svcs.find(s=>s.code==='porter')?.id||svcs[0]?.id||'');const active=latestActive(orders);if(active)resume(active);else setScreen('home')}
+  function resume(active:Order){setOrder(active);setScreen(active.status==='pending'?'finding':'tracking');watch(active)}
+  // Looking up the current order is a convenience: if it fails, the home screen still works.
+  const myOrders=()=>api<Order[]>('/orders').catch(()=>[] as Order[]);
+  async function boot(){setError('');try{const [me,svcs,orders]=await Promise.all([api<any>('/auth/me'),api<Service[]>('/services'),myOrders()]);setUser(me);enter(svcs,orders);navigator.geolocation?.getCurrentPosition(pos=>setPickup({...fallback,lat:pos.coords.latitude,lng:pos.coords.longitude}),()=>{}, {timeout:5000,maximumAge:300000})}catch(e){if((e as ApiError).status===401)setScreen('login');else{setError(customerError(e));setScreen('loading')}}}
   useEffect(()=>{boot();return()=>{orderDone.current=true;if(reconnectTimer.current)clearTimeout(reconnectTimer.current);socket.current?.close();if(searchTimer.current)clearTimeout(searchTimer.current);staleGuard.start()}},[]);
   useEffect(()=>{function onPop(){setScreen(current=>current==='route'?'home':current)}window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop)},[]);
   useEffect(()=>{if(screen==='route')history.pushState({achaagoScreen:'route'},'')},[screen]);
-  async function loggedIn(value:any){setUser(value);const svcs=await api<Service[]>('/services');setServices(svcs);setSelected(svcs.find(s=>s.code==='porter')?.id||svcs[0]?.id||'');setScreen('home')}
+  async function loggedIn(value:any){setUser(value);const [svcs,orders]=await Promise.all([api<Service[]>('/services'),myOrders()]);enter(svcs,orders)}
   function begin(serviceId?:string){setNotice('');if(serviceId)setSelected(serviceId);setScreen('route');setError('')}
   function searchPlaces(value:string){setError('');setSearched(false);updatePlaces([]);setSearch(value);setDropoff(null);setQuote(null);if(searchTimer.current)clearTimeout(searchTimer.current);const query=value.trim();const token=staleGuard.start();if(query.length<3){updatePlaces([]);setPlacesLoading(false);sessionToken.current=null;return}setPlacesLoading(true);searchTimer.current=setTimeout(()=>runSearch(query,token),300)}
   async function runSearch(query:string,token:number){
@@ -64,14 +72,14 @@ export function CustomerFlow() {
   async function pickPlace(row:PlaceRow){if(busy)return;if(searchTimer.current)clearTimeout(searchTimer.current);setSearched(false);setQuote(null);setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);const place=row.source==='google'?await getGooglePlaceDetails(row.place):await api<Point>('/places/'+encodeURIComponent(row.id));sessionToken.current=null;setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError(customerError(e))}finally{setBusy(false)}}
   async function pickOnMap(point:{lat:number;lng:number}){if(busy)return;if(searchTimer.current)clearTimeout(searchTimer.current);setSearched(false);setQuote(null);setBusy(true);setError('');try{staleGuard.start();setPlacesLoading(false);let address='Газрын зураг дээр сонгосон цэг';try{address=await reverseGeocode(point)}catch{}const place:Point={...point,address};setDropoff(place);setSearch(place.address);updatePlaces([]);const value=await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff:place,loaders})});setQuote(value)}catch(e){setError(customerError(e))}finally{setBusy(false)}}
   async function requote(nextLoaders:number){if(busy)return;setLoaders(nextLoaders);if(!dropoff)return;setError('');setBusy(true);try{setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders:nextLoaders})}))}catch(e){setError(customerError(e))}finally{setBusy(false)}}
-  async function placeOrder(){if(busy||!dropoff||!quote||!selectedPrice)return;setOrdering(true);setBusy(true);setError('');try{const value=await api<Order>('/orders',{method:'POST',headers:{'Idempotency-Key':uuid()},body:JSON.stringify({pickup,dropoff,loaders,service_id:selected,payment_method:pay,expected_total:selectedPrice.breakdown.total,quote_token:quote.quote_token})});setOrder(value);setScreen(value.status==='assigned'?'tracking':'finding');watch(value)}catch(e){if((e as ApiError).code==='QUOTE_CHANGED'&&dropoff)setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders})}));setError(customerError(e))}finally{setBusy(false);setOrdering(false)}}
-  function watch(value:Order){orderDone.current=false;setDisconnected(false);if(reconnectTimer.current){clearTimeout(reconnectTimer.current);reconnectTimer.current=null}socket.current?.close();connectOrderSocket(value.id)}
+  async function placeOrder(){if(busy||!dropoff||!quote||!selectedPrice)return;setOrdering(true);setBusy(true);setError('');try{const value=await api<Order>('/orders',{method:'POST',headers:{'Idempotency-Key':uuid()},body:JSON.stringify({pickup,dropoff,loaders,service_id:selected,payment_method:pay,expected_total:selectedPrice.breakdown.total,quote_token:quote.quote_token})});setOrder(value);setScreen(value.status==='assigned'?'tracking':'finding');watch(value)}catch(e){const code=(e as ApiError).code;if(code==='ACTIVE_ORDER_EXISTS'){const active=latestActive(await myOrders());if(active){resume(active);return}}if(code==='QUOTE_CHANGED'&&dropoff){try{setQuote(await api('/quotes',{method:'POST',body:JSON.stringify({pickup,dropoff,loaders})}))}catch{/* Keep the QUOTE_CHANGED message; the retry button requotes. */}}setError(customerError(e))}finally{setBusy(false);setOrdering(false)}}
+  function watch(value:Order){orderDone.current=false;lastStatus.current=value.status;setDisconnected(false);if(reconnectTimer.current){clearTimeout(reconnectTimer.current);reconnectTimer.current=null}socket.current?.close();connectOrderSocket(value.id)}
   function connectOrderSocket(orderId:string){
     const scheme=location.protocol==='https:'?'wss:':'ws:';
     const ws=new WebSocket(`${scheme}//${location.host}/ws/orders/${orderId}`);
     socket.current=ws;
     ws.onopen=()=>setDisconnected(false);
-    ws.onmessage=event=>{const data=JSON.parse(event.data);if(data.type==='snapshot'){const fresh=data.order as Order;setOrder(fresh);if(['assigned','driver_arriving','arrived','picked_up','delivered'].includes(fresh.status)){setScreen('tracking');if(fresh.status==='assigned'){navigator.vibrate?.([120,80,120])}}if(fresh.status==='completed'){orderDone.current=true;setScreen('complete')}if(['cancelled','no_driver_found'].includes(fresh.status)){orderDone.current=true;setNotice(fresh.status==='cancelled'?copy.cancelled:copy.noDriver);setScreen('home')}}};
+    ws.onmessage=event=>{let data:any;try{data=JSON.parse(event.data)}catch{return}if(data.type==='snapshot'){const fresh=data.order as Order;const previous=lastStatus.current;lastStatus.current=fresh.status;setOrder(fresh);if(['assigned','driver_arriving','arrived','picked_up','delivered'].includes(fresh.status)){setScreen('tracking');if(fresh.status==='assigned'&&previous==='pending'){navigator.vibrate?.([120,80,120])}}if(fresh.status==='completed'){orderDone.current=true;setScreen('complete')}if(['cancelled','no_driver_found'].includes(fresh.status)){orderDone.current=true;setNotice(fresh.status==='cancelled'?copy.cancelled:copy.noDriver);setScreen('home')}}};
     ws.onclose=()=>{if(orderDone.current||socket.current!==ws)return;setDisconnected(true);reconnectTimer.current=setTimeout(()=>connectOrderSocket(orderId),2000)};
     ws.onerror=()=>ws.close();
   }
@@ -118,7 +126,7 @@ export function CustomerFlow() {
   </main>;
 
   if((screen==='finding'||screen==='tracking')&&order)return <main className="phone customer-screen">
-    <div className="map-stage"><GoogleMapView route pulse={screen==='finding'} truck={screen==='tracking'} pickup={pickup} dropoff={dropoff} driverLocation={order.driver?.location??null}/></div>
+    <div className="map-stage"><GoogleMapView route pulse={screen==='finding'} truck={screen==='tracking'} pickup={order.pickup} dropoff={order.dropoff} driverLocation={order.driver?.location??null}/></div>
     <section className="sheet">
       {screen==='finding'?<><h1 className="display" role="status">Жолооч хайж байна…</h1><p className="muted">Ойролцоох {order.service_name} жолооч нарт захиалгыг илгээлээ.</p><div aria-hidden="true" style={{height:6,background:'var(--line)',borderRadius:3,marginBottom:16}}><div className="pulse" style={{width:'42%',height:'100%',background:'var(--accent)',borderRadius:3}}/></div></>:<>
         <div className="section-heading"><div><small className="muted" role="status">{mn.statuses[order.status]}</small><h1 className="display" style={{fontSize:24,margin:2}}>~{order.duration_minutes} мин</h1></div><strong className="badge">{order.driver?.plate_number||'—'}</strong></div>

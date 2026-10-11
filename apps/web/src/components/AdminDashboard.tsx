@@ -17,6 +17,9 @@ export function AdminDashboard(){
  const load=useCallback(async()=>{setError('');try{const [os,ds,ss,ps]=await Promise.all([api<Order[]>('/admin/orders'+(status?'?status='+status:'')),api<Driver[]>('/admin/drivers'),api<Service[]>('/admin/services'),api<any>('/admin/pricing')]);setOrders(os);setDrivers(ds);setServices(ss);setPricing(ps)}catch(e){if((e as ApiError).status===401)setPhase('login');else if((e as ApiError).status===403)setPhase('denied');else setError((e as Error).message)}},[status]);
  useEffect(()=>{api<any>('/auth/me').then(me=>{setUser(me);if(['admin','dispatcher'].includes(me.role)){setPhase('ready')}else setPhase('denied')}).catch(()=>setPhase('login'))},[]);
  useEffect(()=>{if(phase==='ready')load()},[phase,load]);
+ // Manual dispatch depends on seeing new orders without a reload. Only the order list is polled:
+ // load() would also reset the settings tab's unsaved pricing/service edits.
+ useEffect(()=>{if(phase!=='ready')return;const id=setInterval(()=>{if(document.hidden)return;api<Order[]>('/admin/orders'+(status?'?status='+status:'')).then(setOrders).catch(()=>{})},10000);return()=>clearInterval(id)},[phase,status]);
  async function logged(me:any){setUser(me);setPhase(['admin','dispatcher'].includes(me.role)?'ready':'denied')}
  async function open(order:Order){setBusy(true);try{const [value,near]=await Promise.all([api<Detail>('/admin/orders/'+order.id),api<Driver[]>('/admin/drivers?order_id='+order.id)]);setDetail(value);setDrivers(near)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function assignDriver(driverId:string){if(!detail)return;setBusy(true);try{await api(`/admin/orders/${detail.id}/assign`,{method:'POST',body:JSON.stringify({driver_id:driverId})});setDetail(await api('/admin/orders/'+detail.id));await load()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
