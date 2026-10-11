@@ -5,6 +5,10 @@ import {api, ApiError, phoneFmt} from '@/lib/api';
 import {Brand} from './Brand';
 import {customerCopy as copy} from './customerCopy';
 
+// Remember the last number so returning customers (most order once or twice a year) skip retyping it.
+const PHONE_KEY = 'achaago.phone';
+function remembered() { try { return typeof window === 'undefined' ? '' : (localStorage.getItem(PHONE_KEY) || '').replace(/\D/g,'').slice(0,8); } catch { return ''; } }
+
 export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<void>;heading?:string}) {
   const [step, setStep] = useState<'phone'|'code'>('phone');
   const [phone, setPhone] = useState('');
@@ -19,6 +23,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     const id = setInterval(() => setSeconds(v => Math.max(0, v - 1)), 1000);
     return () => clearInterval(id);
   }, [seconds]);
+  useEffect(() => { setPhone(current => current || remembered()); }, []);
   useEffect(() => { if (step === 'code' && !busy) codeInput.current?.focus(); }, [step, busy]);
 
   async function request() {
@@ -30,13 +35,14 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     } catch (e) { setError(e instanceof ApiError ? e.message : copy.error); }
     finally { setBusy(false); }
   }
-  async function verify() {
+  async function verify(value = code) {
     // Preserve the existing two-digit test OTP contract.
-    if (busy || code.length !== 2) return;
+    if (busy || value.length !== 2) return;
     setBusy(true); setError('');
     try {
-      const value = await api<{user:any}>('/auth/otp/verify', {method:'POST', body:JSON.stringify({phone:'+976'+phone, code})});
-      await onDone(value.user);
+      const result = await api<{user:any}>('/auth/otp/verify', {method:'POST', body:JSON.stringify({phone:'+976'+phone, code:value})});
+      try { localStorage.setItem(PHONE_KEY, phone); } catch { /* storage blocked: just don't remember */ }
+      await onDone(result.user);
     } catch (e) { setError(e instanceof ApiError ? e.message : copy.error); }
     finally { setBusy(false); }
   }
@@ -46,7 +52,7 @@ export function PhoneLogin({onDone, heading}:{onDone:(user:any)=>void | Promise<
     <div><h1 className="display">Кодоо оруулна уу</h1><p className="muted">+976 {phoneFmt(phone)} дугаарт илгээсэн кодыг оруулна уу.</p></div>
     <form className="auth-form" onSubmit={e => {e.preventDefault(); void verify();}} aria-busy={busy}>
       <label className="field-label" htmlFor="otp">Баталгаажуулах код</label>
-      <input ref={codeInput} id="otp" className="field otp-field" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={2} value={code} disabled={busy} onChange={e => {setCode(e.target.value.replace(/\D/g,'').slice(0,2)); setError('');}} placeholder="00" aria-describedby={error ? 'otp-help auth-error' : 'otp-help'} aria-invalid={!!error}/>
+      <input ref={codeInput} id="otp" className="field otp-field" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={2} value={code} disabled={busy} onChange={e => {const next = e.target.value.replace(/\D/g,'').slice(0,2); setCode(next); setError(''); if (next.length === 2) void verify(next);}} placeholder="00" aria-describedby={error ? 'otp-help auth-error' : 'otp-help'} aria-invalid={!!error}/>
       <p id="otp-help" className="field-help">{copy.codeHelp}</p>
       {error && <p id="auth-error" className="error" role="alert">{error}</p>}
       <button type="button" className="text-button resend-button" onClick={request} disabled={seconds > 0 || busy}>{seconds ? `Дахин илгээх · ${seconds} сек` : 'Код дахин илгээх'}</button>

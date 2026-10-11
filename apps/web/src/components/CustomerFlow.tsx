@@ -50,6 +50,9 @@ export function CustomerFlow() {
   const myOrders=()=>api<Order[]>('/orders').catch(()=>[] as Order[]);
   async function boot(){setError('');try{const [me,svcs,orders]=await Promise.all([api<any>('/auth/me'),api<Service[]>('/services'),myOrders()]);setUser(me);enter(svcs,orders);navigator.geolocation?.getCurrentPosition(pos=>setPickup({...fallback,lat:pos.coords.latitude,lng:pos.coords.longitude}),()=>{}, {timeout:5000,maximumAge:300000})}catch(e){if((e as ApiError).status===401)setScreen('login');else{setError(customerError(e));setScreen('loading')}}}
   useEffect(()=>{boot();return()=>{orderDone.current=true;if(reconnectTimer.current)clearTimeout(reconnectTimer.current);socket.current?.close();if(searchTimer.current)clearTimeout(searchTimer.current);staleGuard.start()}},[]);
+  // Remember the customer's payment choice between orders (storage may be blocked: then just use the default).
+  useEffect(()=>{try{const saved=localStorage.getItem('achaago.pay');if(saved==='cash'||saved==='qpay')setPay(saved)}catch{}},[]);
+  function choosePay(id:'cash'|'qpay'){setPay(id);try{localStorage.setItem('achaago.pay',id)}catch{}}
   useEffect(()=>{function onPop(){setScreen(current=>current==='route'?'home':current)}window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop)},[]);
   useEffect(()=>{if(screen==='route')history.pushState({achaagoScreen:'route'},'')},[screen]);
   async function loggedIn(value:any){setUser(value);const [svcs,orders]=await Promise.all([api<Service[]>('/services'),myOrders()]);enter(svcs,orders)}
@@ -115,7 +118,7 @@ export function CustomerFlow() {
       <div className="section-heading"><h2 id="service-title" className="display">Машинаа сонго</h2>{quote&&<span className="muted">{quote.distance_km} км · ~{quote.duration_minutes} мин</span>}</div>
       <div className="service-options">{(quote?.prices||services.map(service=>({service,breakdown:{total:service.base_fare}}))).map(p=><button className="service-option" key={p.service.id} disabled={busy} onClick={()=>setSelected(p.service.id)} aria-pressed={selected===p.service.id}><span className="service-icon" aria-hidden="true"><ServiceIcon type={p.service.icon}/></span><span className="service-description"><b>{p.service.name_mn}</b><small>{p.service.description_mn}</small></span><span className="service-amount">{!quote&&<small>{copy.basePrice}</small>}<b>{money(p.breakdown.total)}</b></span></button>)}</div>
       <label className="loader-option"><span><b>Ачигч нэмэх</b><small>+{money(quote?.loader_rate??25000)}</small></span><input type="checkbox" checked={loaders>0} disabled={busy} onChange={e=>requote(e.target.checked?1:0)}/></label>
-      <fieldset className="payment-options" disabled={busy}><legend>{copy.payment}</legend><div>{([['qpay','QPay'],['cash','Бэлэн мөнгө']] as const).map(([id,label])=><button key={id} className="btn" aria-pressed={pay===id} onClick={()=>setPay(id)}>{label}</button>)}</div></fieldset>
+      <fieldset className="payment-options" disabled={busy}><legend>{copy.payment}</legend><div>{([['qpay','QPay'],['cash','Бэлэн мөнгө']] as const).map(([id,label])=><button key={id} className="btn" aria-pressed={pay===id} onClick={()=>choosePay(id)}>{label}</button>)}</div></fieldset>
       <div className="order-action">
         {error&&<p className="error" role="alert">{error}</p>}
         {dropoff&&!quote&&!busy&&<button className="btn btn-outline" onClick={()=>requote(loaders)}>{copy.retryQuote}</button>}
