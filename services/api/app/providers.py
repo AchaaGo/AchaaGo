@@ -1,5 +1,6 @@
 import logging
 import math
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
@@ -171,31 +172,61 @@ class DemoQPay(PaymentProvider):
         return False
 
 
+QPAY_TOKEN_KEY = "qpay:token"
+
+
+def token_ttl(expires_in, now: float) -> int:
+    """Seconds to cache a QPay token. QPay sends expires_in as a Unix time, but accept a
+    plain duration too; renew 5 minutes early, and keep at least one minute."""
+    expires = int(expires_in or 0)
+    remaining = expires - int(now) if expires > 1_000_000_000 else expires
+    return max(60, min(remaining - 300, 12 * 3600))
+
+
 class QPay(PaymentProvider):
-    async def token(self):
-        async with httpx.AsyncClient(timeout=15) as client:
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None):
+        self.transport = transport  # tests inject httpx.MockTransport
+
+    def client(self, timeout):
+        return httpx.AsyncClient(timeout=timeout, transport=self.transport)
+
+    async def token(self, fresh=False):
+        # One token for all calls until shortly before it expires: logging in on every
+        # invoice and payment check doubled the calls and risked QPay's rate limits.
+        from . import cache
+        if not fresh:
+            cached = await cache.redis.get(QPAY_TOKEN_KEY)
+            if cached:
+                return cached
+        async with self.client(15) as client:
             result = await client.post(settings.qpay_base_url + "/v2/auth/token",
                                        auth=(settings.qpay_username, settings.qpay_password))
             result.raise_for_status()
-        return result.json()["access_token"]
+        data = result.json()
+        await cache.redis.set(QPAY_TOKEN_KEY, data["access_token"], ex=token_ttl(data.get("expires_in"), time.time()))
+        return data["access_token"]
+
+    async def post(self, path, payload, timeout):
+        # A cached token QPay no longer accepts gets replaced once, then the call is retried.
+        for fresh in (False, True):
+            token = await self.token(fresh=fresh)
+            async with self.client(timeout) as client:
+                result = await client.post(settings.qpay_base_url + path, headers={"Authorization": f"Bearer {token}"},
+                                           json=payload)
+            if result.status_code != 401 or fresh:
+                result.raise_for_status()
+                return result.json()
 
     async def invoice(self, order, callback_url):
-        token = await self.token()
-        async with httpx.AsyncClient(timeout=20) as client:
-            result = await client.post(settings.qpay_base_url + "/v2/invoice", headers={"Authorization": f"Bearer {token}"}, json={
-                "invoice_code": settings.qpay_invoice_code, "sender_invoice_no": order.id,
-                "invoice_receiver_code": order.customer_id, "invoice_description": settings.brand_name + " " + order.id[:8],
-                "amount": order.total_price, "callback_url": callback_url})
-            result.raise_for_status()
-        return result.json()
+        return await self.post("/v2/invoice", {
+            "invoice_code": settings.qpay_invoice_code, "sender_invoice_no": order.id,
+            "invoice_receiver_code": order.customer_id, "invoice_description": settings.brand_name + " " + order.id[:8],
+            "amount": order.total_price, "callback_url": callback_url}, 20)
 
     async def paid(self, invoice_id, amount):
-        token = await self.token()
-        async with httpx.AsyncClient(timeout=15) as client:
-            result = await client.post(settings.qpay_base_url + "/v2/payment/check", headers={"Authorization": f"Bearer {token}"},
-                json={"object_type": "INVOICE", "object_id": invoice_id, "offset": {"page_number": 1, "page_limit": 100}})
-            result.raise_for_status()
-        rows = result.json().get("rows", [])
+        result = await self.post("/v2/payment/check", {"object_type": "INVOICE", "object_id": invoice_id,
+                                                        "offset": {"page_number": 1, "page_limit": 100}}, 15)
+        rows = result.get("rows", [])
         confirmed = sum((Decimal(str(row.get("payment_amount", 0))) for row in rows
                          if row.get("payment_status") == "PAID" and row.get("payment_currency") == "MNT"), Decimal(0))
         return confirmed == Decimal(amount)

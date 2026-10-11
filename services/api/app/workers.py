@@ -6,7 +6,7 @@ from celery.signals import after_setup_logger
 from sqlalchemy import select
 from .config import settings
 from .db import Session, engine
-from .models import Order, Outbox, now
+from .models import Order, Outbox, RefreshSession, now
 from .orders import change_status
 from .providers import sms_provider
 from . import alerts
@@ -14,12 +14,17 @@ from . import alerts
 log = logging.getLogger(__name__)
 HEARTBEAT_KEY = "worker:heartbeat"
 MAX_OUTBOX_ATTEMPTS = 8
+OUTBOX_KEEP_DAYS = 7
 
 celery_app = Celery("achaago", broker=settings.celery_broker_url)
 celery_app.conf.update(task_serializer="json", accept_content=["json"], broker_connection_retry_on_startup=True,
                        broker_connection_timeout=3, task_ignore_result=True,
-                       beat_schedule={"outbox": {"task": "achaago.flush_outbox", "schedule": 2.0},
-                                      "pending-timeout": {"task": "achaago.expire_pending", "schedule": 60.0}})
+                       # Periodic runs expire after a few intervals: while the worker is down beat keeps
+                       # queueing, and without expiry a restart would replay hours of stale runs.
+                       beat_schedule={"outbox": {"task": "achaago.flush_outbox", "schedule": 2.0, "options": {"expires": 10}},
+                                      "pending-timeout": {"task": "achaago.expire_pending", "schedule": 60.0,
+                                                          "options": {"expires": 50}},
+                                      "cleanup": {"task": "achaago.cleanup", "schedule": 3600.0, "options": {"expires": 600}}})
 
 
 @after_setup_logger.connect
@@ -118,3 +123,23 @@ async def expire_orders():
 @celery_app.task(name="achaago.expire_pending")
 def expire_pending():
     asyncio.run(expire_orders())
+
+
+async def cleanup_rows():
+    """Delivered outbox rows and expired refresh sessions only grow otherwise. Order events
+    stay: they are the audit trail."""
+    from datetime import timedelta
+    from sqlalchemy import delete
+    try:
+        async with Session() as db:
+            await db.execute(delete(Outbox).where(Outbox.delivered.is_(True),
+                                                  Outbox.created_at < now() - timedelta(days=OUTBOX_KEEP_DAYS)))
+            await db.execute(delete(RefreshSession).where(RefreshSession.expires_at < now()))
+            await db.commit()
+    finally:
+        await engine.dispose()
+
+
+@celery_app.task(name="achaago.cleanup")
+def cleanup():
+    asyncio.run(cleanup_rows())

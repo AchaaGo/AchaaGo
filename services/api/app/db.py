@@ -3,7 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 from .config import settings
 
-engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+# A runaway query or a long lock wait must not pin a pooled connection forever. 25 s stays
+# under the gateway's 30 s, so the client gets a real error instead of a gateway timeout.
+connect_args = ({"server_settings": {"statement_timeout": "25000"}}
+                if settings.database_url.startswith("postgresql+asyncpg") else {})
+engine = create_async_engine(settings.database_url, pool_pre_ping=True, connect_args=connect_args)
 Session = async_sessionmaker(engine, expire_on_commit=False)
 
 

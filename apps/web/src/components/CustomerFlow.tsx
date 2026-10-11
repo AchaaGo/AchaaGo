@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {ArrowLeft,Check,ChevronRight,MapPin,Menu,MessageSquare,Package,Phone,Search,Star,Truck,UserRound,X} from 'lucide-react';
-import {api,ApiError,money,Order,Point,Quote,Service,uuid} from '@/lib/api';
+import {api,ApiError,money,Order,Point,Quote,refreshSession,Service,uuid} from '@/lib/api';
 import {createSessionToken,createStaleGuard,cycleHighlight,getGooglePlaceDetails,isGooglePlacesAvailable,reverseGeocode,searchGooglePlaces} from '@/lib/googlePlaces';
 import {mn} from '@/lib/messages';
 import {GoogleMapView} from './GoogleMapView';
@@ -55,6 +55,9 @@ export function CustomerFlow() {
   function choosePay(id:'cash'|'qpay'){setPay(id);try{localStorage.setItem('achaago.pay',id)}catch{}}
   useEffect(()=>{function onPop(){setScreen(current=>current==='route'?'home':current)}window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop)},[]);
   useEffect(()=>{if(screen==='route')history.pushState({achaagoScreen:'route'},'')},[screen]);
+  // GPS often lands after the customer has already picked a destination: price the new pickup
+  // right away, instead of failing later at order time with QUOTE_CHANGED.
+  useEffect(()=>{if(screen==='route'&&dropoff&&!busy)void requote(loaders)},[pickup]);
   async function loggedIn(value:any){setUser(value);const [svcs,orders]=await Promise.all([api<Service[]>('/services'),myOrders()]);enter(svcs,orders)}
   function begin(serviceId?:string){setNotice('');if(serviceId)setSelected(serviceId);setScreen('route');setError('')}
   function searchPlaces(value:string){setError('');setSearched(false);updatePlaces([]);setSearch(value);setDropoff(null);setQuote(null);if(searchTimer.current)clearTimeout(searchTimer.current);const query=value.trim();const token=staleGuard.start();if(query.length<3){updatePlaces([]);setPlacesLoading(false);sessionToken.current=null;return}setPlacesLoading(true);searchTimer.current=setTimeout(()=>runSearch(query,token),300)}
@@ -83,7 +86,12 @@ export function CustomerFlow() {
     socket.current=ws;
     ws.onopen=()=>setDisconnected(false);
     ws.onmessage=event=>{let data:any;try{data=JSON.parse(event.data)}catch{return}if(data.type==='snapshot'){const fresh=data.order as Order;const previous=lastStatus.current;lastStatus.current=fresh.status;setOrder(fresh);if(['assigned','driver_arriving','arrived','picked_up','delivered'].includes(fresh.status)){setScreen('tracking');if(fresh.status==='assigned'&&previous==='pending'){navigator.vibrate?.([120,80,120])}}if(fresh.status==='completed'){orderDone.current=true;setScreen('complete')}if(['cancelled','no_driver_found'].includes(fresh.status)){orderDone.current=true;setNotice(fresh.status==='cancelled'?copy.cancelled:copy.noDriver);setScreen('home')}}};
-    ws.onclose=()=>{if(orderDone.current||socket.current!==ws)return;setDisconnected(true);reconnectTimer.current=setTimeout(()=>connectOrderSocket(orderId),2000)};
+    ws.onclose=event=>{
+      if(orderDone.current||socket.current!==ws)return;setDisconnected(true);
+      // 4401: the socket's access token expired (it lives 15 min). Renew the session and reconnect,
+      // instead of retrying with the dead cookie forever.
+      if(event.code===4401){refreshSession().then(outcome=>{if(orderDone.current||socket.current!==ws)return;if(outcome==='expired'){orderDone.current=true;setScreen('login');return}reconnectTimer.current=setTimeout(()=>connectOrderSocket(orderId),outcome==='ok'?0:2000)});return}
+      reconnectTimer.current=setTimeout(()=>connectOrderSocket(orderId),2000)};
     ws.onerror=()=>ws.close();
   }
   async function cancel(){if(busy||!order||!confirm('Захиалгаа цуцлах уу?'))return;setBusy(true);setError('');try{await api(`/orders/${order.id}/cancel`,{method:'POST',body:JSON.stringify({reason:'Хэрэглэгч цуцалсан'})});orderDone.current=true;if(reconnectTimer.current){clearTimeout(reconnectTimer.current);reconnectTimer.current=null}socket.current?.close();setOrder(null);setNotice(copy.cancelled);setScreen('home')}catch(e){setError(customerError(e))}finally{setBusy(false)}}

@@ -34,6 +34,10 @@ class AppConfig {
 
   static const Duration requestTimeout = Duration(seconds: 15);
 
+  /// Writes wait on external providers (Google routing for quotes, QPay
+  /// invoices), so they get as long as the gateway allows (infra/nginx.conf).
+  static const Duration writeTimeout = Duration(seconds: 30);
+
   /// How often the driver app pushes a location update while online.
   static const Duration driverLocationInterval = Duration(seconds: 5);
 }

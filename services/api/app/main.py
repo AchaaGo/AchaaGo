@@ -2,7 +2,9 @@ import asyncio
 import hmac
 import json
 import logging
+import re
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Annotated
@@ -29,6 +31,9 @@ log = logging.getLogger(__name__)
 alerts.install(settings.alert_provider, settings.telegram_bot_token, settings.telegram_chat_id,
                f"{settings.brand_name} {settings.app_env} API")
 WORKER_STALE_SECONDS = 180
+REFRESH_GRACE = timedelta(seconds=30)
+SLOW_REQUEST_SECONDS = 2.0
+REQUEST_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 
 async def worker_age() -> float | None:
@@ -71,14 +76,25 @@ Admin = Annotated[User, Depends(admin)]
 
 @app.middleware("http")
 async def guard_origin(request: Request, call_next):
+    # A request id ties a customer's complaint, a slow-request warning and an error alert
+    # together. A well-formed incoming one is kept, anything else replaced (log injection).
+    incoming = request.headers.get("x-request-id", "")
+    request_id = incoming if REQUEST_ID.match(incoming) else secrets.token_hex(8)
+    request.state.request_id = request_id
+    started = time.monotonic()
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         cookie_auth = request.cookies.get("ag_access") or request.cookies.get("ag_refresh")
         if (origin and origin != settings.public_url.rstrip("/")) or (cookie_auth and not origin and not request.headers.get("authorization")):
-            return JSONResponse({"detail": "ORIGIN_NOT_ALLOWED"}, status_code=403)
+            return JSONResponse({"detail": "ORIGIN_NOT_ALLOWED"}, status_code=403, headers={"X-Request-ID": request_id})
     response = await call_next(request)
+    elapsed = time.monotonic() - started
+    if elapsed > SLOW_REQUEST_SECONDS:
+        log.warning("Slow request %s %s: %.1fs, status %s (request %s)", request.method, request.url.path, elapsed,
+                    response.status_code, request_id)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Request-ID"] = request_id
     return response
 
 
@@ -106,8 +122,10 @@ async def cache_error(request, exc):
 @app.exception_handler(Exception)
 async def unexpected_error(request, exc):
     # Path only: query strings can carry tokens. Logged at ERROR, so app.alerts reports it.
-    log.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse({"detail": "SERVER_ERROR"}, status_code=500)
+    request_id = getattr(request.state, "request_id", "-")
+    log.error("Unhandled error on %s %s (request %s)", request.method, request.url.path, request_id, exc_info=exc)
+    return JSONResponse({"detail": "SERVER_ERROR", "request_id": request_id}, status_code=500,
+                        headers={"X-Request-ID": request_id})
 
 
 @app.get("/health")
@@ -184,7 +202,12 @@ async def refresh(data: RefreshInput, request: Request, response: Response, db: 
     if not session or aware(session.expires_at) <= now():
         raise HTTPException(401, "SESSION_EXPIRED")
     user = await db.get(User, session.user_id)
-    await db.delete(session)
+    if not user:
+        raise HTTPException(401, "SESSION_EXPIRED")
+    # Retire the old token after a short grace period instead of at once: two tabs, or a
+    # client retrying after a lost response, refresh with the same token at nearly the
+    # same moment, and an instant delete logged the slower one out.
+    session.expires_at = min(aware(session.expires_at), now() + REFRESH_GRACE)
     result = await issue_tokens(db, user, response)
     await db.commit()
     return result

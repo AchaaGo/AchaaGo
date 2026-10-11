@@ -20,6 +20,9 @@ def service_json(row):
     return {key: getattr(row, key) for key in ("id", "code", "name_mn", "description_mn", "icon", "base_fare", "per_km_rate", "is_active", "sort_order")}
 
 
+QUOTE_SECONDS = 300
+
+
 def route_hash(data):
     normalized = {"pickup": data.pickup.model_dump(), "dropoff": data.dropoff.model_dump(), "loaders": data.loaders}
     return hashlib.sha256(json.dumps(normalized, sort_keys=True).encode()).hexdigest()
@@ -32,7 +35,26 @@ async def quote(db, data):
     prices = [{"service": service_json(service), "breakdown": calculate_price(service, pricing, route.distance_km, data.loaders, now())} for service in services]
     return {"distance_km": route.distance_km, "duration_minutes": route.duration_minutes, "polyline": route.polyline,
             "prices": prices, "loader_rate": pricing.loader_rate, "approximate": settings.maps_provider == "demo",
-            "quote_token": sign({"kind": "quote", "route_hash": route_hash(data), "totals": {p["service"]["id"]: p["breakdown"]["total"] for p in prices}}, 300)}
+            "quote_token": sign({"kind": "quote", "route_hash": route_hash(data),
+                                 "totals": {p["service"]["id"]: p["breakdown"]["total"] for p in prices},
+                                 # Exactly what the customer was shown, so the order charges that (AGENTS.md:
+                                 # price shown before ordering) without routing a second time: traffic-aware
+                                 # routes shift between calls, which made orders fail with QUOTE_CHANGED.
+                                 "route": {"distance_km": route.distance_km, "duration_minutes": route.duration_minutes,
+                                           "polyline": route.polyline},
+                                 "breakdowns": {p["service"]["id"]: p["breakdown"] for p in prices}}, QUOTE_SECONDS)}
+
+
+def read_quote(data):
+    """The signed quote behind an order. Anything wrong with it, expiry included, means
+    'price again' to the client, never 'log in again'."""
+    try:
+        token = decode(data.quote_token, "quote")
+    except HTTPException:
+        raise HTTPException(409, "QUOTE_CHANGED") from None
+    if token.get("route_hash") != route_hash(data) or token.get("totals", {}).get(data.service_id) != data.expected_total:
+        raise HTTPException(409, "QUOTE_CHANGED")
+    return token
 
 
 def record(db, order, status, actor, reason=None):
@@ -51,20 +73,27 @@ async def create_order(db, data, customer, actor, key):
         return existing
     if await db.scalar(select(Order.id).where(Order.customer_id == customer.id, Order.status.in_(ACTIVE)).limit(1)):
         raise HTTPException(409, "ACTIVE_ORDER_EXISTS")
-    token = decode(data.quote_token, "quote")
-    if token.get("route_hash") != route_hash(data) or token.get("totals", {}).get(data.service_id) != data.expected_total:
+    token = read_quote(data)
+    service = await db.get(Service, data.service_id)
+    if not service or not service.is_active:
         raise HTTPException(409, "QUOTE_CHANGED")
-    fresh = await quote(db, data)
-    selected = next((p for p in fresh["prices"] if p["service"]["id"] == data.service_id), None)
-    if not selected or selected["breakdown"]["total"] != data.expected_total:
+    route, breakdown = token.get("route"), token.get("breakdowns", {}).get(data.service_id)
+    if not route or not breakdown:
+        # A quote issued before route/breakdowns were signed into it: price it again.
+        fresh = await quote(db, data)
+        selected = next((p for p in fresh["prices"] if p["service"]["id"] == data.service_id), None)
+        if not selected:
+            raise HTTPException(409, "QUOTE_CHANGED")
+        route, breakdown = fresh, selected["breakdown"]
+    if breakdown["total"] != data.expected_total:
         raise HTTPException(409, "QUOTE_CHANGED")
     order = Order(customer_id=customer.id, service_id=data.service_id,
                   pickup_lat=data.pickup.lat, pickup_lng=data.pickup.lng, pickup_address=data.pickup.address,
                   dropoff_lat=data.dropoff.lat, dropoff_lng=data.dropoff.lng, dropoff_address=data.dropoff.address,
                   pickup_point=point_value(data.pickup.lat, data.pickup.lng), dropoff_point=point_value(data.dropoff.lat, data.dropoff.lng),
-                  distance_km=fresh["distance_km"], duration_minutes=fresh["duration_minutes"], route_polyline=fresh["polyline"],
-                  loaders=data.loaders, payment_method=data.payment_method, price_breakdown=selected["breakdown"],
-                  total_price=selected["breakdown"]["total"], tracking_token=secrets.token_urlsafe(32),
+                  distance_km=route["distance_km"], duration_minutes=route["duration_minutes"], route_polyline=route.get("polyline"),
+                  loaders=data.loaders, payment_method=data.payment_method, price_breakdown=breakdown,
+                  total_price=breakdown["total"], tracking_token=secrets.token_urlsafe(32),
                   idempotency_key=key, request_hash=request_hash)
     db.add(order)
     await db.flush()

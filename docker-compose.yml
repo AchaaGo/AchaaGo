@@ -1,4 +1,10 @@
 name: achaago
+# Docker keeps container logs forever by default; a full disk takes the database down with it.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 services:
   gateway:
     image: nginx:1.28-alpine
@@ -17,6 +23,7 @@ services:
       retries: 3
     networks: [default, edge]
     restart: unless-stopped
+    logging: *logging
     mem_limit: 128m
   caddy:
     # HTTPS with automatic Let's Encrypt certificates: docker compose --profile https up -d
@@ -39,6 +46,7 @@ services:
         ipv4_address: 172.30.0.2
     depends_on: [gateway]
     restart: unless-stopped
+    logging: *logging
     mem_limit: 128m
   web:
     build:
@@ -51,6 +59,7 @@ services:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
     restart: unless-stopped
+    logging: *logging
     mem_limit: 512m
   api:
     build: ./services/api
@@ -69,6 +78,7 @@ services:
       timeout: 5s
       retries: 8
     restart: unless-stopped
+    logging: *logging
     mem_limit: 768m
   worker:
     build: ./services/api
@@ -78,6 +88,7 @@ services:
     depends_on:
       api: {condition: service_healthy}
     restart: unless-stopped
+    logging: *logging
     mem_limit: 512m
   beat:
     build: ./services/api
@@ -87,6 +98,7 @@ services:
     depends_on:
       api: {condition: service_healthy}
     restart: unless-stopped
+    logging: *logging
     mem_limit: 256m
   backup:
     # Daily pg_dump into ./.data/backups, keeping BACKUP_KEEP_DAYS days (infra/backup.sh).
@@ -104,6 +116,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     restart: unless-stopped
+    logging: *logging
     mem_limit: 256m
   postgres:
     image: postgis/postgis:16-3.5
@@ -119,6 +132,7 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    logging: *logging
     mem_limit: 768m
   redis:
     image: redis:7.4-alpine
@@ -131,6 +145,7 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    logging: *logging
     mem_limit: 256m
 
 networks:
