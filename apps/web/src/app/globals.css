@@ -326,3 +326,70 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 @media (max-width:767px) and (prefers-reduced-motion:reduce) {
   .customer-screen.map-sheet-screen > .map-sheet { transition:none; }
 }
+
+
+/* Official AchaaGo customer palette. Shared admin and semantic colors stay intact. */
+:root {
+  --brand-navy:#0E2350;
+  --brand-blue:#0765F7;
+  --brand-orange:#FE6E01;
+  --brand-blue-soft:#EEF5FF;
+  --map-dark-ground:#182130;
+  --map-dark-label:#BAC5D6;
+  --map-dark-road:#46546B;
+  --map-dark-water:#101B2D;
+}
+:root:has(.customer-desktop,.customer-screen) {
+  --ink-deep:var(--brand-navy);
+  --solid-ink:var(--brand-navy);
+  --accent:var(--brand-blue);
+  --accent-hover:#0554D1;
+  --accent-soft:var(--brand-blue-soft);
+  --mint:#C7DCFF;
+  --mint-soft:var(--brand-blue-soft);
+  --entry-end:#F5F6F8;
+  --terms-line:#C7DCFF;
+  --ground:#F5F6F8;
+  --brand-link:var(--brand-blue);
+}
+:root[data-theme="dark"]:has(.customer-desktop,.customer-screen) {
+  --ink:#EDF1F7;
+  --surface:#1E2736;
+  --ground:#111827;
+  --line:#3C4656;
+  --line-strong:#64748B;
+  --muted:#BAC5D6;
+  --accent-soft:#162E53;
+  --mint-soft:#162E53;
+  --entry-end:#111827;
+  --terms-line:#375784;
+  --brand-link:#82B4FF;
+}
+:root:has(.customer-desktop,.customer-screen) :is(.auth-screen,.customer-screen) :is(button,a,input):focus-visible { outline-color:var(--brand-blue); }
+:root:has(.customer-desktop,.customer-screen) input[type="checkbox"] { accent-color:var(--brand-blue); }
+:root:has(.customer-desktop,.customer-screen) :is(.btn-primary,.btn-accent):hover:not(:disabled) { background:var(--accent-hover); }
+:root:has(.customer-desktop,.customer-screen) :is(.terms-consent a,.address-edit,.auth-terms a) { color:var(--brand-link); }
+.customer-desktop .phone-entry .phone-prefix { color:var(--brand-link); background:var(--mint-soft); border-color:var(--brand-blue); }
+.customer-desktop .phone-entry #phone { border-color:var(--brand-blue); }
+.customer-desktop .phone-entry .auth-hero { border-bottom-color:var(--brand-orange); }
+:root:has(.customer-desktop,.customer-screen) .home-search { border-color:var(--brand-blue); }
+:root:has(.customer-desktop,.customer-screen) .vehicle-badge { color:var(--brand-navy); background:var(--brand-orange); }
+:root:has(.customer-desktop,.customer-screen) .vehicle-card[aria-pressed="true"] .vehicle-check { color:white; background:var(--brand-blue); border-color:var(--brand-blue); }
+:root:has(.customer-desktop,.customer-screen) .pickup-stop::before { background:var(--brand-blue); }
+.customer-screen .destination-stop::before, .customer-order-dot { background:var(--brand-orange); }
+.customer-screen .summary-address .lucide-map-pin { fill:var(--brand-orange); }
+.customer-screen .pin { box-shadow:0 0 0 20px color-mix(in srgb,var(--brand-blue) 22%,transparent); }
+.customer-screen .truck-pin { box-shadow:0 0 0 3px white; }
+.customer-screen .icon-btn { box-shadow:0 4px 14px color-mix(in srgb,var(--brand-navy) 14%,transparent); }
+.customer-screen .route-heading .icon-btn { box-shadow:none; }
+.customer-screen .sheet { box-shadow:0 -8px 28px color-mix(in srgb,var(--brand-navy) 14%,transparent); }
+.customer-screen .route-search { box-shadow:0 4px 18px color-mix(in srgb,var(--brand-navy) 7%,transparent); }
+.customer-screen .suggest-list { box-shadow:0 10px 28px color-mix(in srgb,var(--brand-navy) 19%,transparent); }
+:root:has(.customer-desktop,.customer-screen) .qpay-dialog::backdrop { background:color-mix(in srgb,var(--brand-navy) 60%,transparent); }
+.customer-panel::backdrop { background:color-mix(in srgb,var(--brand-navy) 25%,transparent); }
+@media (max-width:767px) {
+  .customer-screen .booking-sheet { box-shadow:0 -3px 12px color-mix(in srgb,var(--brand-navy) 3%,transparent); }
+}
+:root[data-theme="dark"]:has(.customer-desktop,.customer-screen) :is(input,textarea)::placeholder { color:#9AAAC1; }
+:root[data-theme="dark"]:has(.customer-desktop,.customer-screen) :is(.map,.gmap) { background:var(--map-dark-ground); }
+:root[data-theme="dark"]:has(.customer-desktop,.customer-screen) .map::after { background:#283B50; box-shadow:-230px 350px 0 10px #283B50,-80px 220px 0 -10px #304052; }

@@ -30,26 +30,28 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
 ];
 
 // Change only map colors; preserve the map instance, viewport, routes and gestures.
-const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
-  {elementType:'geometry',stylers:[{color:'#18251e'}]},
-  {elementType:'labels.text.fill',stylers:[{color:'#b7c5bd'}]},
-  {elementType:'labels.text.stroke',stylers:[{color:'#18251e'}]},
+// Canvas map colors use the same CSS tokens as customer controls.
+const cssColor = (token: string) => getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+const darkMapStyle = (): google.maps.MapTypeStyle[] => [
+  {elementType:'geometry',stylers:[{color:cssColor('--map-dark-ground')}]},
+  {elementType:'labels.text.fill',stylers:[{color:cssColor('--map-dark-label')}]},
+  {elementType:'labels.text.stroke',stylers:[{color:cssColor('--map-dark-ground')}]},
   {featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},
   {featureType:'transit',stylers:[{visibility:'off'}]},
-  {featureType:'road',elementType:'geometry',stylers:[{color:'#43564a'}]},
+  {featureType:'road',elementType:'geometry',stylers:[{color:cssColor('--map-dark-road')}]},
   {featureType:'road',elementType:'labels.icon',stylers:[{visibility:'off'}]},
-  {featureType:'water',elementType:'geometry',stylers:[{color:'#0d1b22'}]},
+  {featureType:'water',elementType:'geometry',stylers:[{color:cssColor('--map-dark-water')}]},
 ];
-const mapStyles = () => document.documentElement.dataset.theme === 'dark' ? DARK_MAP_STYLE : MAP_STYLE;
+const mapStyles = () => document.documentElement.dataset.theme === 'dark' ? darkMapStyle() : MAP_STYLE;
 
 function pickupIcon(maps: typeof google.maps): google.maps.Symbol {
-  return {path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#14213d', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3};
+  return {path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: cssColor('--brand-blue'), fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3};
 }
 function dropoffIcon(): google.maps.Symbol {
-  return {path: 'M -7,-7 L 7,-7 L 7,7 L -7,7 Z', fillColor: '#f2a516', fillOpacity: 1, strokeColor: '#14213d', strokeWeight: 3};
+  return {path: 'M -7,-7 L 7,-7 L 7,7 L -7,7 Z', fillColor: cssColor('--brand-orange'), fillOpacity: 1, strokeColor: cssColor('--brand-blue'), strokeWeight: 3};
 }
 function truckIcon(maps: typeof google.maps): google.maps.Symbol {
-  return {path: maps.SymbolPath.CIRCLE, scale: 13, fillColor: '#14213d', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3};
+  return {path: maps.SymbolPath.CIRCLE, scale: 13, fillColor: cssColor('--brand-blue'), fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3};
 }
 
 function currentMaps(): typeof google.maps | null {
@@ -175,7 +177,7 @@ export function GoogleMapView({route = false, routePolyline, pulse = false, truc
       if(cancelled)return;
       lines.push(
         new maps.Polyline({map,path,strokeColor:'#ffffff',strokeWeight:9,strokeOpacity:1,zIndex:0}),
-        new maps.Polyline({map,path,strokeColor:'#14213d',strokeWeight:5,strokeOpacity:1,zIndex:1}),
+        new maps.Polyline({map,path,strokeColor:cssColor('--brand-blue'),strokeWeight:5,strokeOpacity:1,zIndex:1}),
       );
       routeLinesRef.current=lines;
       const bounds=new maps.LatLngBounds();bounds.extend(pickup);bounds.extend(dropoff);
