@@ -53,6 +53,12 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.locator('#otp').fill('00');
   await page.getByRole('button',{name:'Хаашаа ачих вэ?'}).click();
   const search=page.getByRole('combobox'),order=page.locator('.order-action > .btn-accent');
+  // The bottom sheet covers the lower part of the map, so tap the strip of map just above it.
+  async function tapMap(){
+   const map=page.getByRole('application',{name:'Газрын зураг'});
+   const [mapBox,sheetBox]=await Promise.all([map.boundingBox(),page.locator('.map-sheet').boundingBox()]);
+   await map.click({position:{x:Math.round(width/2),y:Math.round(sheetBox.y-mapBox.y-12)}});
+  }
   async function choose(text){await search.fill(text);await page.getByRole('option').first().waitFor();await search.press('ArrowDown');await search.press('Enter');await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled)}
   await choose('Хүргэх');assert.deepEqual(quotes.at(-1).dropoff,destination);
   await page.getByRole('button',{name:'Авах хаягийг өөрчлөх',exact:true}).click();
@@ -64,10 +70,7 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.evaluate(()=>window.__initialLocation({coords:{latitude:48,longitude:107}}));
   assert.match(await page.locator('.pickup-stop dd').innerText(),/Авах туршилтын хаяг/);
   // Map taps edit the active endpoint, preserving the other endpoint.
-  // The bottom sheet covers the lower part of the map, so tap the strip of map just above it.
-  const map=page.getByRole('application',{name:'Газрын зураг'});
-  const [mapBox,sheetBox]=await Promise.all([map.boundingBox(),page.locator('.map-sheet').boundingBox()]);
-  await map.click({position:{x:Math.round(width/2),y:Math.round(sheetBox.y-mapBox.y-12)}});
+  await tapMap();
   await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled);
   assert.equal(quotes.at(-1).pickup.lat,47.93);assert.deepEqual(quotes.at(-1).dropoff,destination);
   await page.evaluate(()=>window.__denyLocation=true);
@@ -77,7 +80,7 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.getByRole('button',{name:'Одоогийн байршил ашиглах',exact:true}).click();
   await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled);
   assert.equal(quotes.at(-1).pickup.lat,47.94);
-  failQuote=true;await page.getByRole('application',{name:'Газрын зураг'}).click();
+  failQuote=true;await tapMap();
   await page.locator('.order-action .error').waitFor();assert.equal(await order.isDisabled(),true);
   failQuote=false;await page.getByRole('button',{name:'Үнэ дахин тооцоолох',exact:true}).click();
   await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled);
