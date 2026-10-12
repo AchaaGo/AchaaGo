@@ -8,6 +8,7 @@ import {GoogleMapView} from './GoogleMapView';
 import {PhoneLogin} from './PhoneLogin';
 import {QpayDialog} from './QpayDialog';
 import {CustomerPanel} from './CustomerPanel';
+import {MapSheet} from './MapSheet';
 import {VehicleCards} from './VehicleCards';
 import {customerCopy as copy} from './customerCopy';
 
@@ -129,10 +130,9 @@ export function CustomerFlow() {
   if(screen==='loading')return <main className="phone customer-screen flow-loading"><div role="status">{error ? <><p>{error}</p><button className="btn btn-accent" onClick={boot}>{copy.retry}</button></> : <><span className="spinner" aria-hidden="true"/><p>{copy.loading}</p></>}</div></main>;
   if(screen==='login')return <PhoneLogin onDone={loggedIn}/>;
 
-  if(screen==='home')return <main className="phone customer-screen">
+  if(screen==='home')return <main className="phone customer-screen map-sheet-screen">
     <div className="map-stage home-map"><GoogleMapView pickup={pickup}/><div className="map-toolbar"><button className="icon-btn" aria-label="Цэс" aria-haspopup="dialog" aria-expanded={panel==='menu'} aria-controls={panel==='menu'?'customer-panel':undefined} onClick={()=>setPanel('menu')}><Menu aria-hidden="true"/></button><button className="icon-btn" aria-label="Профайл" aria-haspopup="dialog" aria-expanded={panel==='profile'} aria-controls={panel==='profile'?'customer-panel':undefined} onClick={()=>setPanel('profile')}><UserRound aria-hidden="true"/></button></div></div>
-    <section className="sheet booking-sheet" aria-labelledby="home-title">
-      <div className="booking-handle" aria-hidden="true"/>
+    <MapSheet key="home" className="booking-sheet" labelledBy="home-title">
       <span className="muted">Сайн байна уу{user?.name?`, ${user.name}`:''}</span>
       <h1 id="home-title" className="display">Юу ачуулах вэ?</h1>
       {notice&&<p className="status-card" role="status">{notice}</p>}
@@ -140,11 +140,11 @@ export function CustomerFlow() {
       <div className="service-grid desktop-vehicle-selector">{services.map(s=><button className="service-card" key={s.id} onClick={()=>begin(s.id)}><span className="service-icon" aria-hidden="true"><ServiceIcon type={s.icon}/></span><strong className="display">{s.name_mn}</strong><small className="muted">{s.description_mn}</small><b className="service-price">{copy.basePrice} {money(s.base_fare)}</b></button>)}</div>
       <VehicleCards services={services} onSelect={begin} home/>
       {!services.length&&<div className="status-card" role="status"><p>{copy.noServices}</p><button className="btn btn-outline" onClick={boot}>{copy.retry}</button></div>}
-    </section>
+    </MapSheet>
     {panel&&<CustomerPanel kind={panel} customer={user} hasActiveOrder={!!order&&['pending','assigned','driver_arriving','arrived','picked_up','delivered'].includes(order.status)} onClose={()=>setPanel(null)}/>}
   </main>;
 
-  if(screen==='route')return <main className="phone customer-screen route-screen">
+  if(screen==='route')return <main className="phone customer-screen route-screen map-sheet-screen">
     <section className="route-search" aria-labelledby="route-title">
       <div className="route-heading"><button className="icon-btn" disabled={busy} onClick={()=>setScreen('home')} aria-label="Буцах"><ArrowLeft aria-hidden="true"/></button><div><h1 id="route-title" className="display">Хаашаа ачих вэ?</h1><small>{addressTarget==='pickup'?copy.editingPickup:copy.editingDestination}</small></div></div>
       <div className="address-targets" role="group" aria-label={copy.addressTarget}>
@@ -158,8 +158,7 @@ export function CustomerFlow() {
       {places.length>0&&<div id="destination-listbox" role="listbox" aria-label={addressTarget==='pickup'?copy.pickupSuggestions:copy.destinationSuggestions} className="suggest-list">{places.map((p,index)=><button className="suggest-option" key={p.id} id={`place-option-${index}`} role="option" aria-selected={index===highlight} disabled={busy} onMouseEnter={()=>setHighlight(index)} onClick={()=>pickPlace(p)}><MapPin size={18} aria-hidden="true"/><span>{p.address}</span></button>)}</div>}
     </section>
     <div className="map-stage"><GoogleMapView route={pickupReady&&!!dropoff} routePolyline={quote?.polyline} pickup={pickupReady?pickup:null} dropoff={dropoff} onPick={pickOnMap}/></div>
-    <section className="sheet booking-sheet" aria-labelledby="service-title">
-      <div className="booking-handle" aria-hidden="true"/>
+    <MapSheet key="route" className="booking-sheet" labelledBy="service-title">
       <dl className="booking-addresses">
         <div className="booking-stop pickup-stop"><dt>{copy.pickupLabel}</dt><dd>{pickupReady?pickup.address:copy.needsPickup}<button type="button" className="address-edit" disabled={busy} onClick={()=>editAddress('pickup')} aria-label={copy.changePickup}>{copy.changeAddress}</button></dd></div>
         <div className="booking-stop destination-stop"><dt>{copy.destinationLabel}</dt><dd>{dropoff?.address??copy.destinationPending}<button type="button" className="address-edit" disabled={busy} onClick={()=>editAddress('dropoff')} aria-label={copy.changeDestination}>{copy.changeAddress}</button></dd></div>
@@ -176,12 +175,12 @@ export function CustomerFlow() {
         <button className="btn btn-accent" disabled={!pickupReady||!dropoff||!quote||!selectedPrice||busy} aria-describedby="order-help" onClick={placeOrder}>{busy&&<span className="spinner" aria-hidden="true"/>}{busy?(ordering?copy.orderLoading:copy.quoteLoading):selectedPrice?`${selectedPrice.service.name_mn} захиалах · ${money(selectedPrice.breakdown.total)}`:copy.order}</button>
         <p id="order-help" className="order-help" role="status">{busy?(ordering?copy.orderLoading:copy.quoteLoading):!pickupReady?copy.needsPickup:!dropoff?copy.needsAddress:!quote?copy.needsQuote:'Захиалгын нийт үнэ дээр харагдаж байна.'}</p>
       </div>
-    </section>
+    </MapSheet>
   </main>;
 
-  if((screen==='finding'||screen==='tracking')&&order)return <main className="phone customer-screen">
+  if((screen==='finding'||screen==='tracking')&&order)return <main className="phone customer-screen map-sheet-screen">
     <div className="map-stage"><GoogleMapView route routePolyline={order.polyline} pulse={screen==='finding'} truck={screen==='tracking'} pickup={pickup} dropoff={dropoff} driverLocation={order.driver?.location??null}/></div>
-    <section className="sheet">
+    <MapSheet key="order">
       {screen==='finding'?<><h1 className="display" role="status">Жолооч хайж байна…</h1><p className="muted">Ойролцоох {order.service_name} жолооч нарт захиалгыг илгээлээ.</p><div aria-hidden="true" style={{height:6,background:'var(--line)',borderRadius:3,marginBottom:16}}><div className="pulse" style={{width:'42%',height:'100%',background:'var(--accent)',borderRadius:3}}/></div></>:<>
         <div className="section-heading"><div><small className="muted" role="status">{mn.statuses[order.status]}</small><h1 className="display" style={{fontSize:24,margin:2}}>~{order.duration_minutes} мин</h1></div><strong className="badge">{order.driver?.plate_number||'—'}</strong></div>
         <div style={{display:'flex',alignItems:'center',gap:13,marginBottom:14}}><span className="service-icon" aria-hidden="true">{order.driver?.name?.slice(0,2).toUpperCase()||'Ж'}</span><div style={{flex:1,minWidth:0}}><b>{order.driver?.name||'Жолооч'}</b><span className="muted" style={{display:'flex',gap:5,alignItems:'center',marginTop:3}}><Star size={15} fill="var(--accent)" aria-hidden="true"/>{order.driver?.rating||'Шинэ'} · {order.service_name}</span></div></div>
@@ -193,7 +192,7 @@ export function CustomerFlow() {
       {error&&<p className="error" role="alert" style={{marginTop:12}}>{error}</p>}
       {order.can_cancel&&<button className="btn btn-outline" disabled={busy} style={{width:'100%',marginTop:12}} onClick={cancel}>Захиалга цуцлах</button>}
       <p className="sr-only" role="status">{busy?copy.loading:''}</p>
-    </section>
+    </MapSheet>
     {qpay&&<QpayDialog invoice={qpay} onClose={()=>setQpay(null)}/>}
   </main>;
 

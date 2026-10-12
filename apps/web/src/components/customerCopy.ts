@@ -1,5 +1,7 @@
 // Customer presentation strings. Keep transport and Maps helpers unchanged.
 export const customerCopy = {
+  expandMapSheet: 'Захиалгын хэсгийг нээх',
+  collapseMapSheet: 'Газрын зураг томруулах',
   switchLight: 'Гэгээтэй горимд шилжих',
   switchDark: 'Харанхуй горимд шилжих',
   switchTheme: 'Өнгөний горим солих',
