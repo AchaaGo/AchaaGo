@@ -6,7 +6,7 @@ const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
  const browser=await chromium.launch({headless:true,channel:process.env.BOOKING_BROWSER||undefined});
  try{for(const width of [320,390,430]){
   const context=await browser.newContext({viewport:{width,height:700},reducedMotion:width===390?'reduce':'no-preference'});
-  const page=await context.newPage();let logoutCalls=0,failLogout=true;
+  const page=await context.newPage();let logoutCalls=0,failLogout=true,signedIn=false;
   const user={phone:'+97699000003',...(width===430?{name:'Туршилтын хэрэглэгч'}:{})};
   await page.addInitScript(()=>{
    window.__mapPresses=0;window.__mapCreates=0;
@@ -15,16 +15,19 @@ const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.route(url+'/api/**',async route=>{
    const p=new URL(route.request().url()).pathname;let body={};
    if(p.endsWith('/auth/otp/request'))body={ok:true};
-   else if(p.endsWith('/auth/otp/verify'))body={user};
-   else if(p.endsWith('/auth/me'))body=user;
+   else if(p.endsWith('/auth/otp/verify')){signedIn=true;body={user};}
+   else if(p.endsWith('/auth/me')){if(!signedIn)return route.fulfill({status:401,json:{detail:'LOGIN_REQUIRED'}});body=user;}
+   else if(p.endsWith('/auth/refresh'))return route.fulfill({status:401,json:{detail:'SESSION_EXPIRED'}});
+   else if(p.endsWith('/config'))body={dev_otp:true};
+   else if(p.endsWith('/orders'))body=[];
    else if(p.endsWith('/services'))body=[{id:'porter',code:'porter',name_mn:'Портер',description_mn:'Ачаа',icon:'truck',base_fare:30000,per_km_rate:2000,is_active:true,sort_order:2}];
-   else if(p.endsWith('/auth/logout')){assert.equal(route.request().method(),'POST');assert.deepEqual(route.request().postDataJSON(),{});logoutCalls++;if(failLogout)return route.fulfill({status:503,json:{detail:'UNKNOWN'}});body={ok:true};}
+   else if(p.endsWith('/auth/logout')){assert.equal(route.request().method(),'POST');assert.deepEqual(route.request().postDataJSON(),{});logoutCalls++;if(failLogout)return route.fulfill({status:503,json:{detail:'UNKNOWN'}});signedIn=false;body={ok:true};}
    else throw Error('Unexpected API request '+p);
    await route.fulfill({json:body});
   });
   await page.goto(url);
   await page.locator('#phone').fill('99000003');await page.locator('#accept-terms').check();
-  await page.getByRole('button',{name:'Үргэлжлүүлэх',exact:true}).click();await page.locator('#otp').fill('00');await page.getByRole('button',{name:'Баталгаажуулах',exact:true}).click();
+  await page.getByRole('button',{name:'Үргэлжлүүлэх',exact:true}).click();await page.locator('#otp').fill('00');
   const menu=page.getByRole('button',{name:'Цэс',exact:true}),profile=page.getByRole('button',{name:'Профайл',exact:true});
   await menu.waitFor();await page.getByRole('application',{name:'Газрын зураг'}).waitFor();
   const before=await menu.boundingBox();

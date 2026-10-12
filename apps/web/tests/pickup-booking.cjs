@@ -23,12 +23,14 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   const service={id:'porter',code:'porter',name_mn:'Портер',description_mn:'1 тонн хүртэл',icon:'truck',base_fare:30000,per_km_rate:2000,is_active:true,sort_order:2};
   const destination={lat:47.90,lng:106.92,address:'Хүргэх туршилтын хаяг'};
   const pickup={lat:47.92,lng:106.90,address:'Авах туршилтын хаяг'};
-  const quotes=[];let failQuote=false,created=null;
+  const quotes=[];let failQuote=false,created=null,signedIn=false;
   await page.route('**/api/**',async route=>{
    const req=route.request(),url=new URL(req.url()),p=url.pathname;let body={};
    if(p.endsWith('/auth/otp/request'))body={ok:true};
-   else if(p.endsWith('/auth/otp/verify'))body={user:{name:'Туршилт'}};
-   else if(p.endsWith('/auth/me'))body={name:'Туршилт'};
+   else if(p.endsWith('/auth/otp/verify')){signedIn=true;body={user:{name:'Туршилт'}};}
+   else if(p.endsWith('/auth/me')){if(!signedIn)return route.fulfill({status:401,json:{detail:'LOGIN_REQUIRED'}});body={name:'Туршилт'};}
+   else if(p.endsWith('/auth/refresh'))return route.fulfill({status:401,json:{detail:'SESSION_EXPIRED'}});
+   else if(p.endsWith('/config'))body={dev_otp:true};
    else if(p.endsWith('/services'))body=[service];
    else if(p.endsWith('/places'))body=[{id:url.searchParams.get('q').includes('Авах')?'pickup':'destination',address:url.searchParams.get('q')}];
    else if(p.endsWith('/places/pickup'))body=pickup;
@@ -37,6 +39,8 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
     const data=req.postDataJSON();quotes.push(data);
     if(failQuote)return route.fulfill({status:503,json:{detail:'UNKNOWN'}});
     body={distance_km:6,duration_minutes:15,loader_rate:25000,quote_token:'fixture',prices:[{service,breakdown:{total:42000+data.loaders*25000}}]};
+   }else if(p.endsWith('/orders')&&req.method()==='GET'){
+    body=[];
    }else if(p.endsWith('/orders')){
     created=req.postDataJSON();body={...created,id:'fixture-order',service_name:'Портер',total_price:created.expected_total,status:'pending',can_cancel:false};
    }else throw Error('Unexpected API request '+p);
@@ -46,7 +50,7 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.goto(endpoint);
   await page.locator('#phone').fill('99000003');await page.locator('#accept-terms').check();
   await page.getByRole('button',{name:'Үргэлжлүүлэх',exact:true}).click();
-  await page.locator('#otp').fill('00');await page.getByRole('button',{name:'Баталгаажуулах',exact:true}).click();
+  await page.locator('#otp').fill('00');
   await page.getByRole('button',{name:'Хаашаа ачих вэ?'}).click();
   const search=page.getByRole('combobox'),order=page.locator('.order-action > .btn-accent');
   async function choose(text){await search.fill(text);await page.getByRole('option').first().waitFor();await search.press('ArrowDown');await search.press('Enter');await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled)}

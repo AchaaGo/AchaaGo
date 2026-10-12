@@ -23,13 +23,14 @@ const destination={lat:47.91,lng:106.92,address:'Улаанбаатар, Сүх�
     for(const width of [320,360,390,430,800]) {
       const context=await browser.newContext({viewport:{width,height:844},locale:'mn-MN'});
       const page=await context.newPage();
-      let failQuote=false,orderCalls=0;
+      let failQuote=false,orderCalls=0,signedIn=false;
       await page.route('**/api/**',async route=>{
         const request=route.request(),p=new URL(request.url()).pathname;
         let body={};
         if(p.endsWith('/auth/otp/request')) body={ok:true};
-        else if(p.endsWith('/auth/otp/verify')) body={user:{name:'Туршилт'}};
-        else if(p.endsWith('/auth/me')) body={name:'Туршилт'};
+        else if(p.endsWith('/auth/otp/verify')) {signedIn=true;body={user:{name:'Туршилт'}};}
+        else if(p.endsWith('/auth/me')) {if(!signedIn) return route.fulfill({status:401,json:{detail:'LOGIN_REQUIRED'}});body={name:'Туршилт'};}
+        else if(p.endsWith('/auth/refresh')) return route.fulfill({status:401,json:{detail:'SESSION_EXPIRED'}});
         else if(p.endsWith('/services')) body=services;
         else if(p.endsWith('/places')) body=[{id:'destination',address:destination.address}];
         else if(p.includes('/places/')) body=destination;
@@ -37,8 +38,9 @@ const destination={lat:47.91,lng:106.92,address:'Улаанбаатар, Сүх�
           if(failQuote) return route.fulfill({status:503,json:{detail:'UNKNOWN'}});
           const loaders=request.postDataJSON().loaders;
           body={distance_km:7.5,duration_minutes:19,loader_rate:25000,approximate:false,quote_token:'fixture-token',prices:services.map((service,i)=>({service,breakdown:{total:totals[i]+loaders*25000}}))};
-        } else if(p.endsWith('/orders')) {orderCalls++;throw Error('Unexpected real-order attempt');}
-        else if(p.endsWith('/config')) body={};
+        } else if(p.endsWith('/orders')&&request.method()==='GET') body=[];
+        else if(p.endsWith('/orders')) {orderCalls++;throw Error('Unexpected real-order attempt');}
+        else if(p.endsWith('/config')) body={dev_otp:true};
         else throw Error('Unhandled API request '+p);
         await route.fulfill({json:body});
       });
@@ -49,7 +51,6 @@ const destination={lat:47.91,lng:106.92,address:'Улаанбаатар, Сүх�
       await page.getByRole('checkbox').check();
       await page.getByRole('button',{name:'Үргэлжлүүлэх',exact:true}).click();
       await page.locator('input[autocomplete="one-time-code"]').fill('00');
-      await page.getByRole('button',{name:'Баталгаажуулах',exact:true}).click();
       await page.getByRole('button',{name:'Хаашаа ачих вэ?'}).click();
       const cards=page.locator('.mobile-vehicle-selector .vehicle-card');
       if(width<768) {
