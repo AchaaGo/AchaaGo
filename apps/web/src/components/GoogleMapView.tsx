@@ -29,6 +29,19 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
   {featureType: 'road', elementType: 'labels.icon', stylers: [{visibility: 'off'}]},
 ];
 
+// Change only map colors; preserve the map instance, viewport, routes and gestures.
+const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
+  {elementType:'geometry',stylers:[{color:'#18251e'}]},
+  {elementType:'labels.text.fill',stylers:[{color:'#b7c5bd'}]},
+  {elementType:'labels.text.stroke',stylers:[{color:'#18251e'}]},
+  {featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},
+  {featureType:'transit',stylers:[{visibility:'off'}]},
+  {featureType:'road',elementType:'geometry',stylers:[{color:'#43564a'}]},
+  {featureType:'road',elementType:'labels.icon',stylers:[{visibility:'off'}]},
+  {featureType:'water',elementType:'geometry',stylers:[{color:'#0d1b22'}]},
+];
+const mapStyles = () => document.documentElement.dataset.theme === 'dark' ? DARK_MAP_STYLE : MAP_STYLE;
+
 function pickupIcon(maps: typeof google.maps): google.maps.Symbol {
   return {path: maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#14213d', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3};
 }
@@ -94,13 +107,21 @@ export function GoogleMapView({route = false, routePolyline, pulse = false, truc
       disableDefaultUI: true,
       clickableIcons: false,
       gestureHandling: 'greedy',
-      styles: MAP_STYLE,
+      styles: mapStyles(),
     });
     mapInstanceRef.current = map;
     map.addListener('click', (event: google.maps.MapMouseEvent) => {
       if (event.latLng) onPickRef.current?.({lat: event.latLng.lat(), lng: event.latLng.lng()});
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMap]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!showMap || !map) return;
+    const observer = new MutationObserver(() => map.setOptions({styles:mapStyles()}));
+    observer.observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+    return () => observer.disconnect();
   }, [showMap]);
 
   useEffect(() => {

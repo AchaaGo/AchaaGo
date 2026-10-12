@@ -1,6 +1,6 @@
 # AchaaGo — handoff report
 
-State of the repository on 2026-10-12 (`main` at `e8b67d7` plus this file), written by Claude Code for the next coding agent.
+State of the repository on 2026-10-12, written by Claude Code for the next coding agent.
 
 Read `AGENTS.md` first: it is the product spec. This report covers what is actually built, the contracts the code relies on, recent changes, and what is still open. Where the two disagree about the current code, trust the code, then this report.
 
@@ -9,13 +9,15 @@ Read `AGENTS.md` first: it is the product spec. This report covers what is actua
 | Surface | Path | State |
 |---|---|---|
 | Backend API | `services/api` | OTP auth, services, quotes, orders, manual dispatch, status flow, WebSockets, public tracking, SMS/push through an outbox, driver endpoints, QPay and cash. |
-| Customer web | `apps/web`: `/`, `/t/[token]`, `/terms` | Screens 1–6 plus completion and rating. The home page is phone-first. |
+| Customer web | `apps/web`: `/`, `/t/[token]`, `/terms` | Screens 1–6 plus completion and rating. The home page is phone-first. Orange and forest-green brand design with a light and a dark theme, a choosable pickup address, vehicle cards, a draggable bottom sheet, and menu and profile panels. |
 | Admin panel | `apps/web`: `/admin` | Order list with a detail drawer, manual assign (nearest drivers first), create order by phone, approve/suspend drivers, services and pricing. **No live map yet.** |
 | Mobile app | `apps/mobile` (Flutter) | One app for **drivers and customers**: a role gate after login picks the screens. Android APK and iOS builds run in CI. |
 | Automatic matching | — | Not started (milestone 7). Dispatch is manual. |
 | Landing page | — | Not started (milestone 8). |
 
 The driver side of the mobile app covers login, registration, going online and offline, and the active order: accept, status updates, cash received. Location updates are sent by a timer only while the driver screen is open.
+
+The mobile app still has the original navy and yellow palette from AGENTS.md §5 and no dark theme, so it no longer matches the web design.
 
 Two things from AGENTS.md are not in the app yet:
 - **Push notifications:** the app has no Firebase and never calls `POST /driver/push-token`. The server side is ready.
@@ -29,6 +31,7 @@ The layout differs from the suggestion in AGENTS.md §4. The API uses flat modul
 
 ```
 services/api/app/
+  catalog.py    ensures the booking services exist (see "Services" below); used by seed.py
   main.py       every HTTP route and both WebSockets, middleware (origin guard, request IDs,
                 slow-request log), exception handlers, /health and /health/full
   orders.py     quotes and the signed quote token, order creation, status changes (record()),
@@ -50,6 +53,10 @@ apps/web/src/
   app/t/[token]/page.tsx    public tracking (no login)
   components/CustomerFlow.tsx   screens 3–6 and completion
   components/PhoneLogin.tsx     screens 1–2
+  components/MapSheet.tsx       draggable, collapsible bottom sheet over the map
+  components/VehicleCards.tsx   service cards with vector illustrations
+  components/CustomerPanel.tsx  menu and profile dialogs
+  components/ThemeToggle.tsx    light/dark switch (saved in localStorage `achaago-theme`, default: the device setting)
   components/PublicTracking.tsx, AdminDashboard.tsx, GoogleMapView.tsx, QpayDialog.tsx
   components/customerCopy.ts    customer UI strings
   lib/api.ts         the only HTTP client: timeouts, retry, session renewal
@@ -88,7 +95,7 @@ cd apps/mobile && flutter analyze && flutter test
 ```
 
 - **API tests run on SQLite and fakeredis** (`tests/conftest.py`), never on Postgres. So PostGIS-only paths are not covered by CI: `ST_DistanceSphere` in `GET /admin/drivers`, Geometry columns, and the asyncpg `statement_timeout`.
-- **Web CI typechecks, runs two small unit test files and builds:** `tests/road-route.cjs` (route decoding) and `src/lib/googlePlaces.test.ts`. There are no browser or component tests.
+- **Web CI** typechecks, runs the unit tests (`tests/road-route.cjs`, `tests/customer-panel.cjs`, `src/lib/googlePlaces.test.ts`), builds, then starts the built app and runs six Playwright browser tests (`tests/theme`, `map-sheet`, `mobile-booking`, `pickup-booking`, `customer-panels`, `road-map`). Each browser test serves its own API, WebSocket and Maps responses as fixtures, so only the web app needs to run. To run one locally: build and start the app, then `BOOKING_URL=http://localhost:3000 node tests/<name>.cjs`. The Maps key is a placeholder in CI (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=ci-fixture-key`).
 
 **CI** (`.github/workflows`):
 
@@ -166,7 +173,14 @@ Break one of these only on purpose, and change both clients together.
 - **Route line:** the web map (`GoogleMapView`) draws the road geometry the server sends as an encoded `polyline` on quotes and orders (`lib/roadRoute.ts`). It never draws a straight pickup-to-drop-off line. Without a polyline (demo maps provider), it asks the browser Routes library, and shows a retry notice if that fails.
 - **Quote screen:** the line is drawn only once a quote has arrived, so a tap on the map does not trigger a routing request of its own.
 - **Mobile:** `lib/core/route_polyline.dart` does the same decoding.
-- **Another branch:** `origin/uiux/achaa-go-polish` holds a separate dark-theme design with features that never reached `main`. Only its road-route commit (`391e6ba`) was ported.
+- **Pickup address:** the pickup starts as the device location (or a default point in the city centre) and the customer can change it (search, map tap or "use current location") as well as the drop-off. While a new pickup is being chosen, the route and price wait for it.
+- **Late GPS fix:** `pickupTouched` in `CustomerFlow.tsx` is set as soon as the customer taps a service. A GPS fix that arrives after that is ignored, so the pickup stays at the default city-centre point (labelled "Одоогийн байршил") until the customer changes it. This avoids a stale quote but can leave a wrong pickup unnoticed. See Technical debt.
+
+### Services
+
+- **Catalog:** `app/catalog.py` runs at startup (through `seed.py`) and creates any missing booking service without overwriting fares an operator has edited. It also resets every service's `sort_order` to the list position in `catalog.py` on each start, so reordering services in the admin panel does not survive a restart.
+- **Мотоцикл (motorcycle):** created inactive with fares at 0. It stays hidden from customers until an operator sets `base_fare` and `per_km_rate` and activates it in the admin panel.
+- **Амжиргаа:** its description is still the placeholder `[ТАЙЛБАР]`.
 
 ### Dispatch (manual)
 
@@ -211,6 +225,8 @@ Break one of these only on purpose, and change both clients together.
 
 | Commit | Change |
 |---|---|
+| merge of `uiux/achaa-go-polish` | The dark design and its features (brand palette, light/dark themes, pickup selection, vehicle cards, draggable sheet, menu and profile panels, the inactive motorcycle service) merged into `main` together with the session, quote and request fixes below. Their six browser tests now run in CI. |
+| `05b158e` | Road-following routes on the web map instead of a straight line. |
 | `e8b67d7` | The phone-first home page lets a signed-in customer straight in. Before, every visit asked for a new SMS code. |
 | `c5287a8` | Web: `/auth/me` renews the session on page load; a GET is not retried after a timeout. Mobile: the `00` hint shows only when `dev_otp` is true; a complete 4-digit code submits itself; iOS offers the code from Messages. |
 | `cf8a488` | **Sessions:** web renews the 15-minute access cookie, 30 s refresh grace, mobile single-flight refresh. **Orders:** charged exactly as quoted, with 409 `QUOTE_CHANGED` instead of 401. **Requests:** timeouts and a GET retry, request IDs, slow-request log, `statement_timeout`. **Jobs:** expiry and cleanup, QPay token cache. **Web on HTTP:** `uuid()` falls back to `crypto.getRandomValues` because `crypto.randomUUID` does not exist on plain HTTP, which broke ordering. **Docker:** log rotation. |
@@ -236,7 +252,7 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
 4. **Firebase project** for driver push. On the server: `FCM_PROVIDER` set to anything but `console`, `FCM_PROJECT_ID`, and `GOOGLE_APPLICATION_CREDENTIALS`. The app side is still to build (see below).
 5. **Server Google Maps key** (`MAPS_PROVIDER=google`, `GOOGLE_MAPS_API_KEY`) for real distances. Until then, quotes use the demo router and are marked `approximate`.
 6. **Apple Developer and Google Play accounts** to publish the app.
-7. **Product decisions:** the Амжиргаа service definition, real prices, cancellation rules and fees, driver commission, brand name (AGENTS.md §14).
+7. **Product decisions:** the Амжиргаа service definition, real prices, fares for the motorcycle service, cancellation rules and fees, driver commission, brand name (AGENTS.md §14).
 
 ### Not built yet (compared with AGENTS.md)
 
@@ -244,12 +260,14 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
 - **Background GPS for drivers** (AGENTS.md §3): location stops when the driver leaves the app.
 - **Automatic matching** (milestone 7): offer orders to the nearest online drivers (`drivers:geo` and PostGIS are already filled), with the dispatcher as fallback.
 - **Admin live map** of online drivers and open orders (§10.1). `GET /admin/drivers` already returns locations.
+- **Mobile design parity:** bring the brand palette and dark theme from the web to the Flutter app.
 - **Landing page** (milestone 8): `/` is currently the customer app.
 - **Optional web push** after ordering (§6).
 - **Floor/elevator pricing:** `floor_rate` is stored but unused. Scheduled orders: the `scheduled_for` column exists but nothing sets it.
 
 ### Technical debt
 
+- **Late GPS fix on the quote screen** (see Maps): let a fix that arrives late replace the pickup as long as the customer has not changed the pickup themselves, and re-price once. Today it is dropped silently.
 - `GET /admin/orders` and `GET /admin/drivers` run one or more queries per row (N+1). Fine at the current size; fix with joins before volume grows.
 - Mobile does not reconnect its order WebSocket; 5 s polling covers the gap.
 - CI never runs against Postgres/PostGIS (see §3). A job with a `postgis/postgis:16-3.5` service would cover the PostGIS paths.
@@ -264,6 +282,7 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
   - The web key is `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env`.
   - The signing keystore lives only in a secret.
 - **Plain-HTTP limits:** geolocation, `crypto.randomUUID`, service workers and `Secure` cookies all need HTTPS. Keep the `uuid()` fallback in `lib/api.ts` until the site is HTTPS-only.
+- **No registry access in some sandboxes:** an agent whose network policy blocks npm and PyPI cannot build or run the web app or API tests locally. CI is then the only check, so push to a `claude/**` branch and read the run logs.
 - **Strings:** all user-facing text is Mongolian, kept in `customerCopy.ts` / `messages.ts` (web) and `strings.dart` / `errors_mn.dart` (mobile). Code, comments and docs are in English.
 
 ## 9. Suggested next steps

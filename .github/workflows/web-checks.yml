@@ -11,6 +11,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/web
@@ -31,8 +32,30 @@ jobs:
 
       - name: Unit tests
         run: |
-          node --test tests/road-route.cjs
+          node --test tests/road-route.cjs tests/customer-panel.cjs
           node --experimental-strip-types --no-warnings --test src/lib/googlePlaces.test.ts
 
+      # The key is a placeholder: the browser tests below replace the Maps SDK and the API
+      # with fixtures, but the real-map code path only runs when a key is set at build time.
       - name: Build
         run: npm run build
+        env:
+          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ci-fixture-key
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      # Each test serves its own API, WebSocket and Maps responses, so only the built web app runs.
+      - name: Browser tests
+        run: |
+          npm start &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000 > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:3000 > /dev/null
+          export BOOKING_URL=http://localhost:3000
+          status=0
+          for name in theme map-sheet mobile-booking pickup-booking customer-panels road-map; do
+            echo "::group::$name"
+            node tests/$name.cjs || { echo "::error::$name failed"; status=1; }
+            echo "::endgroup::"
+          done
+          exit $status
