@@ -64,7 +64,7 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.evaluate(()=>window.__initialLocation({coords:{latitude:48,longitude:107}}));
   assert.match(await page.locator('.pickup-stop dd').innerText(),/Авах туршилтын хаяг/);
   // Map taps edit the active endpoint, preserving the other endpoint.
-  await page.getByRole('application',{name:'Газрын зураг'}).click();
+  await page.getByRole('application',{name:'Газрын зураг'}).click({position:{x:Math.round(width/2),y:20}});
   await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled);
   assert.equal(quotes.at(-1).pickup.lat,47.93);assert.deepEqual(quotes.at(-1).dropoff,destination);
   await page.evaluate(()=>window.__denyLocation=true);

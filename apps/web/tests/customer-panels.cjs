@@ -46,7 +46,7 @@ const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   assert.equal(await page.evaluate(()=>document.body.style.overflow),'');assert.deepEqual(await menu.boundingBox(),before);
   await menu.click();await dialog.waitFor();await page.mouse.click(width/2,10);await dialog.waitFor({state:'detached'});
   assert.equal(await page.evaluate(()=>window.__mapPresses),0);
-  await page.getByRole('application',{name:'Газрын зураг'}).click();assert.equal(await page.evaluate(()=>window.__mapPresses),1);assert.equal(await page.evaluate(()=>window.__mapCreates),1);
+  await page.getByRole('application',{name:'Газрын зураг'}).click({position:{x:Math.round(width/2),y:20}});assert.equal(await page.evaluate(()=>window.__mapPresses),1);assert.equal(await page.evaluate(()=>window.__mapCreates),1);
   await profile.click();const personal=page.getByRole('dialog',{name:'Профайл',exact:true});await personal.waitFor();
   assert.equal(await personal.locator('.customer-panel-identity strong').innerText(),user.name||'+976 9900 0003');
   assert.match(await personal.locator('.customer-panel-identity').innerText(),/\+976 9900 0003/);
