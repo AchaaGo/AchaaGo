@@ -120,7 +120,7 @@ export function CustomerFlow() {
       <p id="search-feedback" className="search-feedback" role="status">{placesLoading?copy.searching:busy?copy.quoteLoading:dropoff?copy.selectedAddress:searched&&!places.length&&!error?copy.noResults:search.trim().length>0&&search.trim().length<3?copy.searchShort:copy.searchHelp}</p>
       {places.length>0&&<div id="destination-listbox" role="listbox" aria-label="Хүргэх хаягийн санал" className="suggest-list">{places.map((p,index)=><button className="suggest-option" key={p.id} id={`place-option-${index}`} role="option" aria-selected={index===highlight} disabled={busy} onMouseEnter={()=>setHighlight(index)} onClick={()=>pickPlace(p)}><MapPin size={18} aria-hidden="true"/><span>{p.address}</span></button>)}</div>}
     </section>
-    <div className="map-stage"><GoogleMapView route={!!dropoff} pickup={pickup} dropoff={dropoff} onPick={pickOnMap}/></div>
+    <div className="map-stage"><GoogleMapView route={!!dropoff&&!!quote} routePolyline={quote?.polyline} pickup={pickup} dropoff={dropoff} onPick={pickOnMap}/></div>
     <section className="sheet" aria-labelledby="service-title">
       {dropoff&&<div className="selected-address"><MapPin size={19} aria-hidden="true"/><div><small>{copy.selectedAddress}</small><strong>{dropoff.address}</strong></div></div>}
       <div className="section-heading"><h2 id="service-title" className="display">Машинаа сонго</h2>{quote&&<span className="muted">{quote.distance_km} км · ~{quote.duration_minutes} мин</span>}</div>
@@ -137,7 +137,7 @@ export function CustomerFlow() {
   </main>;
 
   if((screen==='finding'||screen==='tracking')&&order)return <main className="phone customer-screen">
-    <div className="map-stage"><GoogleMapView route pulse={screen==='finding'} truck={screen==='tracking'} pickup={order.pickup} dropoff={order.dropoff} driverLocation={order.driver?.location??null}/></div>
+    <div className="map-stage"><GoogleMapView route routePolyline={order.polyline} pulse={screen==='finding'} truck={screen==='tracking'} pickup={order.pickup} dropoff={order.dropoff} driverLocation={order.driver?.location??null}/></div>
     <section className="sheet">
       {screen==='finding'?<><h1 className="display" role="status">Жолооч хайж байна…</h1><p className="muted">Ойролцоох {order.service_name} жолооч нарт захиалгыг илгээлээ.</p><div aria-hidden="true" style={{height:6,background:'var(--line)',borderRadius:3,marginBottom:16}}><div className="pulse" style={{width:'42%',height:'100%',background:'var(--accent)',borderRadius:3}}/></div></>:<>
         <div className="section-heading"><div><small className="muted" role="status">{mn.statuses[order.status]}</small><h1 className="display" style={{fontSize:24,margin:2}}>~{order.duration_minutes} мин</h1></div><strong className="badge">{order.driver?.plate_number||'—'}</strong></div>

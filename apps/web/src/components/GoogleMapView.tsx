@@ -1,19 +1,22 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import {loadGoogleMaps, readLocationPermission, shouldShowRealMap, type LocationPermission, type MapSdkState} from '@/lib/googleMaps';
+import {roadRoute} from '@/lib/roadRoute';
+import {customerCopy as copy} from './customerCopy';
 import {MapBackdrop} from './MapBackdrop';
 
 type LatLng = {lat: number; lng: number};
 
 type Props = {
   route?: boolean;
+  routePolyline?: string | null;
   pulse?: boolean;
   truck?: boolean;
   pickup?: LatLng | null;
   dropoff?: LatLng | null;
   driverLocation?: LatLng | null;
   /** Only wired up where the existing flow lets the user set an address
-   *  by hand (the route/quote screen's drop-off). Omit elsewhere. */
+   *  by hand (either endpoint in the route/quote screen). Omit elsewhere. */
   onPick?: (point: LatLng) => void;
 };
 
@@ -40,20 +43,12 @@ function currentMaps(): typeof google.maps | null {
   return (window as unknown as {google?: {maps?: typeof google.maps}}).google?.maps ?? null;
 }
 
-/**
- * Drop-in replacement for `MapBackdrop` on the customer-facing screens: a
- * real, interactive Google Map when a key is configured, the SDK loads,
- * and location permission isn't denied — otherwise the same decorative
- * illustration the app already used, unchanged.
- *
- * Deliberately Maps JavaScript API only (markers + a plain polyline
- * between two points): no Places, Directions, or Geocoding calls, so no
- * address is resolved for a map-clicked point — the caller supplies a
- * generic label for it, the same way it already does for other points.
- */
-export function GoogleMapView({route = false, pulse = false, truck = false, pickup, dropoff, driverLocation, onPick}: Props) {
+/** Draw provider road geometry; never substitute an endpoint-to-endpoint line. */
+export function GoogleMapView({route = false, routePolyline, pulse = false, truck = false, pickup, dropoff, driverLocation, onPick}: Props) {
   const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   const [sdkState, setSdkState] = useState<MapSdkState>('idle');
+  const [routeState,setRouteState]=useState<'idle'|'loading'|'ready'|'error'>('idle');
+  const [retryRoute,setRetryRoute]=useState(0);
   const [permission, setPermission] = useState<LocationPermission>('unknown');
   const showMap = shouldShowRealMap({hasApiKey, sdkState, locationPermission: permission});
 
@@ -137,28 +132,37 @@ export function GoogleMapView({route = false, pulse = false, truck = false, pick
       truckMarkerRef.current = null;
     }
 
-    routeLinesRef.current.forEach(line => line.setMap(null));
-    routeLinesRef.current = [];
-    if (route && pickup && dropoff) {
-      const path = [pickup, dropoff];
-      routeLinesRef.current = [
-        new maps.Polyline({map, path, strokeColor: '#ffffff', strokeWeight: 9, strokeOpacity: 1, zIndex: 0}),
-        new maps.Polyline({map, path, strokeColor: '#14213d', strokeWeight: 5, strokeOpacity: 1, zIndex: 1}),
-      ];
-    }
+    // Marker updates do not refetch the route or move the user's map viewport.
+  }, [showMap, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, driverLocation?.lat, driverLocation?.lng, truck]);
 
-    if (pickup && dropoff) {
-      const bounds = new maps.LatLngBounds();
-      bounds.extend(pickup);
-      bounds.extend(dropoff);
-      map.fitBounds(bounds, 48);
-    } else if (dropoff) {
-      map.panTo(dropoff);
-    } else if (pickup) {
-      map.panTo(pickup);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMap, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, driverLocation?.lat, driverLocation?.lng, route, truck]);
+  useEffect(()=>{
+    const map=mapInstanceRef.current,maps=currentMaps();
+    if(!showMap||!map||!maps)return;
+    let cancelled=false;
+    let timeout:ReturnType<typeof setTimeout>|undefined;
+    const lines:google.maps.Polyline[]=[];
+    routeLinesRef.current.forEach(line=>line.setMap(null));
+    routeLinesRef.current=[];
+    if(pickup&&dropoff){const bounds=new maps.LatLngBounds();bounds.extend(pickup);bounds.extend(dropoff);map.fitBounds(bounds,48)}
+    else if(pickup||dropoff)map.panTo((pickup||dropoff)!);
+    if(!route||!pickup||!dropoff){setRouteState('idle');return}
+    setRouteState('loading');
+    Promise.race([
+      roadRoute(maps,pickup,dropoff,routePolyline),
+      new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error('Route timeout')),15000)}),
+    ]).then(path=>{
+      if(cancelled)return;
+      lines.push(
+        new maps.Polyline({map,path,strokeColor:'#ffffff',strokeWeight:9,strokeOpacity:1,zIndex:0}),
+        new maps.Polyline({map,path,strokeColor:'#14213d',strokeWeight:5,strokeOpacity:1,zIndex:1}),
+      );
+      routeLinesRef.current=lines;
+      const bounds=new maps.LatLngBounds();bounds.extend(pickup);bounds.extend(dropoff);
+      path.forEach(point=>bounds.extend(point));map.fitBounds(bounds,48);
+      setRouteState('ready');
+    }).catch(()=>{if(!cancelled)setRouteState('error')}).finally(()=>{if(timeout)clearTimeout(timeout)});
+    return()=>{cancelled=true;if(timeout)clearTimeout(timeout);lines.forEach(line=>line.setMap(null))};
+  },[showMap,route,pickup?.lat,pickup?.lng,dropoff?.lat,dropoff?.lng,routePolyline,retryRoute]);
 
   useEffect(() => {
     return () => {
@@ -169,6 +173,11 @@ export function GoogleMapView({route = false, pulse = false, truck = false, pick
     };
   }, []);
 
-  if (!showMap) return <MapBackdrop route={route} pulse={pulse} truck={truck} />;
-  return <div ref={containerRef} className="gmap" aria-label="Газрын зураг" role="application" />;
+  const routeNotice=route&&pickup&&dropoff ? !showMap
+    ? (hasApiKey&&sdkState!=='error'?copy.mapLoading:copy.mapUnavailable)
+    : routeState==='loading'?copy.roadLoading:routeState==='error'?copy.roadUnavailable:'' : '';
+  return <>
+    {showMap?<div ref={containerRef} className="gmap" aria-label="Газрын зураг" role="application"/>:<MapBackdrop route={false} pulse={pulse} truck={truck}/>}
+    {routeNotice&&<div className="map-route-status" role="status"><span>{routeNotice}</span>{showMap&&routeState==='error'&&<button type="button" onClick={()=>setRetryRoute(value=>value+1)}>{copy.retry}</button>}</div>}
+  </>;
 }

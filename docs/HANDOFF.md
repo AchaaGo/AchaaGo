@@ -88,7 +88,7 @@ cd apps/mobile && flutter analyze && flutter test
 ```
 
 - **API tests run on SQLite and fakeredis** (`tests/conftest.py`), never on Postgres. So PostGIS-only paths are not covered by CI: `ST_DistanceSphere` in `GET /admin/drivers`, Geometry columns, and the asyncpg `statement_timeout`.
-- **Web CI only typechecks and builds.** The one web unit test file runs by hand: `node --experimental-strip-types --test src/lib/googlePlaces.test.ts`.
+- **Web CI typechecks, runs two small unit test files and builds:** `tests/road-route.cjs` (route decoding) and `src/lib/googlePlaces.test.ts`. There are no browser or component tests.
 
 **CI** (`.github/workflows`):
 
@@ -160,6 +160,13 @@ Break one of these only on purpose, and change both clients together.
   - `POST /driver/location` is limited to 40 per minute.
   - It writes Postgres (`last_lat`, `last_lng`, PostGIS `last_point`) and the Redis GEO set `drivers:geo`, then publishes a location event to the driver's active orders.
   - A location counts as fresh for 90 s.
+
+### Maps
+
+- **Route line:** the web map (`GoogleMapView`) draws the road geometry the server sends as an encoded `polyline` on quotes and orders (`lib/roadRoute.ts`). It never draws a straight pickup-to-drop-off line. Without a polyline (demo maps provider), it asks the browser Routes library, and shows a retry notice if that fails.
+- **Quote screen:** the line is drawn only once a quote has arrived, so a tap on the map does not trigger a routing request of its own.
+- **Mobile:** `lib/core/route_polyline.dart` does the same decoding.
+- **Another branch:** `origin/uiux/achaa-go-polish` holds a separate dark-theme design with features that never reached `main`. Only its road-route commit (`391e6ba`) was ported.
 
 ### Dispatch (manual)
 
@@ -246,7 +253,7 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
 - `GET /admin/orders` and `GET /admin/drivers` run one or more queries per row (N+1). Fine at the current size; fix with joins before volume grows.
 - Mobile does not reconnect its order WebSocket; 5 s polling covers the gap.
 - CI never runs against Postgres/PostGIS (see §3). A job with a `postgis/postgis:16-3.5` service would cover the PostGIS paths.
-- The web has no unit tests in CI. The request flow in `lib/api.ts` (renewal, retry, timeouts) is the best candidate.
+- The request flow in `lib/api.ts` (renewal, retry, timeouts) has no tests. It is the best candidate for the next web test file.
 
 ## 8. Gotchas
 

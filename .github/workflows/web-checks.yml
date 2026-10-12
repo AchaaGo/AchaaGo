@@ -29,5 +29,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit tests
+        run: |
+          node --test tests/road-route.cjs
+          node --experimental-strip-types --no-warnings --test src/lib/googlePlaces.test.ts
+
       - name: Build
         run: npm run build
