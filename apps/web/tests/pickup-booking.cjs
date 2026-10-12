@@ -38,7 +38,7 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
    else if(p.endsWith('/quotes')){
     const data=req.postDataJSON();quotes.push(data);
     if(failQuote)return route.fulfill({status:503,json:{detail:'UNKNOWN'}});
-    body={distance_km:6,duration_minutes:15,loader_rate:25000,quote_token:'fixture',prices:[{service,breakdown:{total:42000+data.loaders*25000}}]};
+    body={distance_km:6,duration_minutes:15,polyline:'_p~iF~ps|U_ulLnnqC_mqNvxq`@',loader_rate:25000,quote_token:'fixture',prices:[{service,breakdown:{total:42000+data.loaders*25000}}]};
    }else if(p.endsWith('/orders')&&req.method()==='GET'){
     body=[];
    }else if(p.endsWith('/orders')){
@@ -64,7 +64,10 @@ const endpoint=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await page.evaluate(()=>window.__initialLocation({coords:{latitude:48,longitude:107}}));
   assert.match(await page.locator('.pickup-stop dd').innerText(),/Авах туршилтын хаяг/);
   // Map taps edit the active endpoint, preserving the other endpoint.
-  await page.getByRole('application',{name:'Газрын зураг'}).click({position:{x:Math.round(width/2),y:20}});
+  // The bottom sheet covers the lower part of the map, so tap the strip of map just above it.
+  const map=page.getByRole('application',{name:'Газрын зураг'});
+  const [mapBox,sheetBox]=await Promise.all([map.boundingBox(),page.locator('.map-sheet').boundingBox()]);
+  await map.click({position:{x:Math.round(width/2),y:Math.round(sheetBox.y-mapBox.y-12)}});
   await page.waitForFunction(()=>!document.querySelector('.order-action > .btn-accent').disabled);
   assert.equal(quotes.at(-1).pickup.lat,47.93);assert.deepEqual(quotes.at(-1).dropoff,destination);
   await page.evaluate(()=>window.__denyLocation=true);
