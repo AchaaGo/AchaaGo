@@ -25,6 +25,16 @@ both customers who prefer an app and, per `AGENTS.md`, drivers.
 - Assigned-order view, accept, and the arriving → arrived → picked up →
   delivered → completed status buttons, including cash/QPay confirmation
 
+**Appearance**
+- The web design: orange and forest-green brand colours with a light and a
+  dark theme (`lib/theme/app_theme.dart`, the same tokens as
+  `apps/web/src/app/globals.css`)
+- The theme follows the device setting until the customer picks one with the
+  sun/moon button (login, code entry, route screen, driver app bar, and the
+  customer menu); the choice is remembered on the device, also after logout
+- The Google map switches to a dark style with the theme
+  (`lib/theme/map_style.dart`, the same styles as the web map)
+
 See `BACKEND_REQUIREMENTS.md` for the few things the API doesn't support yet
 (notably: no driver decline/reject endpoint, so only accept is wired up).
 
@@ -166,7 +176,7 @@ if either reports a problem.
 ```
 lib/
   config/        Single source of truth for the API base URL etc.
-  theme/         Colors/typography matching AGENTS.md's design tokens
+  theme/         Light and dark palettes (`context.palette`) and map styles, matching the web tokens
   l10n/          All Mongolian UI strings and backend-error translations
   core/          HTTP client, token storage, formatting helpers
   models/        Typed request/response shapes for the API contracts
@@ -317,6 +327,12 @@ check that the key is the iOS-restricted one with Maps SDK for iOS allowed.
   for real) rather than embedding a QPay SDK.
 - **Push notifications** are not wired up — see
   `BACKEND_REQUIREMENTS.md` §3.
+- **Fonts**: the web uses Unbounded and Golos Text; the app still uses the
+  platform font, because the web's font packages ship WOFF/WOFF2 files,
+  which Flutter cannot use (it needs TTF or OTF). Adding the fonts means shipping TTF copies as app assets.
+- **Colours**: use `context.palette.<name>` (never a fixed colour) so a screen
+  follows the theme. A palette colour is not a constant, so a widget that
+  uses one cannot be `const`.
 - **Live tracking** uses the authenticated `/ws/orders/{id}` and public
   `/ws/tracking/{token}` WebSockets, backed by a 5–8s REST poll fallback
   in case a socket never connects or drops, so tracking still works even

@@ -115,7 +115,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(Strings.driverRegisterSubtitle, style: TextStyle(color: AppColors.muted)),
+                      Text(Strings.driverRegisterSubtitle, style: TextStyle(color: context.palette.muted)),
                       const SizedBox(height: 18),
                       TextFormField(
                         controller: _name,

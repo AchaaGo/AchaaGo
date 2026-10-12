@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/loading_view.dart';
+import '../../widgets/theme_toggle_button.dart';
 import '../login/phone_entry_screen.dart';
 import 'driver_active_order_screen.dart';
 
@@ -180,13 +181,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('AchaaGo · Жолооч'),
-        actions: [IconButton(onPressed: _logout, icon: const Icon(Icons.logout))],
+        actions: [
+          const ThemeToggleButton(),
+          IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
+        ],
       ),
       body: RefreshIndicator(onRefresh: _load, child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
+    final p = context.palette;
     if (_loading) return const LoadingView();
     final profile = _profile;
     if (profile == null) {
@@ -198,7 +203,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 60),
-          Icon(pending ? Icons.hourglass_top : Icons.block, size: 48, color: AppColors.muted),
+          Icon(pending ? Icons.hourglass_top : Icons.block, size: 48, color: p.muted),
           const SizedBox(height: 16),
           Text(
             pending ? Strings.driverPendingHeading : Strings.driverSuspendedHeading,
@@ -208,7 +213,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(height: 8),
           Text(
             pending ? Strings.driverPendingBody : Strings.driverSuspendedBody,
-            style: const TextStyle(color: AppColors.muted),
+            style: TextStyle(color: p.muted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -221,7 +226,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           child: SwitchListTile(
             value: profile.isOnline,
             onChanged: _busyToggle ? null : _toggleOnline,
-            activeThumbColor: AppColors.ink,
+            activeThumbColor: p.onBrand,
             title: Text(
               profile.isOnline ? Strings.driverOnline : Strings.driverOffline,
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -233,7 +238,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         const SizedBox(height: 16),
         if (_activeOrder != null)
           Card(
-            color: AppColors.accentSoft,
+            color: p.accentSoft,
             child: ListTile(
               onTap: _openOrder,
               leading: const Icon(Icons.local_shipping_outlined),
@@ -252,7 +257,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.star, color: AppColors.accent, size: 18),
+              Icon(Icons.star, color: p.accent, size: 18),
               const SizedBox(width: 6),
               Text('${Strings.driverRatingLabel}: ${profile.rating!.toStringAsFixed(1)}'),
             ],

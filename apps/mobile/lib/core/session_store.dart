@@ -19,6 +19,7 @@ class SessionStore {
 
   static const _accessKey = 'ag_access_token';
   static const _refreshKey = 'ag_refresh_token';
+  static const _themeKey = 'ag_theme';
 
   String? _accessToken;
   String? _refreshToken;
@@ -38,6 +39,12 @@ class SessionStore {
   Future<String?> readAccessToken() async => _accessToken ?? await _read(_accessKey);
 
   Future<String?> readRefreshToken() async => _refreshToken ?? await _read(_refreshKey);
+
+  /// The theme the customer picked with the toggle ('light' or 'dark'). Kept
+  /// when logging out: it is a device preference, not part of the session.
+  Future<String?> readThemePreference() => _read(_themeKey);
+
+  Future<void> saveThemePreference(String value) => _write(_themeKey, value);
 
   Future<void> clear() async {
     _accessToken = null;

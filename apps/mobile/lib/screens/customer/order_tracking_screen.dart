@@ -146,7 +146,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
             Text(formatMoney(amount), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
             const SizedBox(height: 12),
             if (isDemo)
-              const Text(Strings.qpayDemoNotice, style: TextStyle(color: AppColors.muted), textAlign: TextAlign.center)
+              Text(Strings.qpayDemoNotice, style: TextStyle(color: dialogContext.palette.muted), textAlign: TextAlign.center)
             else if (qrImage != null && qrImage.isNotEmpty)
               Image.memory(base64Decode(qrImage), width: 220, height: 220),
             for (final entry in urls)
@@ -179,6 +179,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
     final driver = _order.driver;
     final initials = (driver?.name?.trim().isNotEmpty ?? false) ? driver!.name!.trim().substring(0, 1).toUpperCase() : 'Ж';
     final needsQpay = _order.paymentMethod == 'qpay' && _order.paymentStatus != 'paid';
+    final p = context.palette;
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
@@ -198,14 +199,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(describeStatus(_order.status), style: const TextStyle(color: AppColors.muted)),
+                      Text(describeStatus(_order.status), style: TextStyle(color: p.muted)),
                       Text('~${_order.durationMinutes} мин', style: Theme.of(context).textTheme.headlineMedium),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.ink, width: 2), borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(border: Border.all(color: p.ink, width: 2), borderRadius: BorderRadius.circular(10)),
                   child: Text(driver?.plateNumber ?? '—', style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
@@ -215,8 +216,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: AppColors.ink,
-                  child: Text(initials, style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 18)),
+                  backgroundColor: p.solidInk,
+                  child: Text(initials, style: TextStyle(color: p.accent, fontWeight: FontWeight.w700, fontSize: 18)),
                 ),
                 const SizedBox(width: 13),
                 Expanded(
@@ -225,9 +226,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with OrderWat
                     children: [
                       Text(driver?.name ?? 'Жолооч', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
                       Row(children: [
-                        const Icon(Icons.star, size: 15, color: AppColors.accent),
+                        Icon(Icons.star, size: 15, color: p.accent),
                         const SizedBox(width: 4),
-                        Text('${driver?.rating?.toStringAsFixed(1) ?? 'Шинэ'} · ${_order.serviceName}', style: const TextStyle(color: AppColors.muted)),
+                        Text('${driver?.rating?.toStringAsFixed(1) ?? 'Шинэ'} · ${_order.serviceName}', style: TextStyle(color: p.muted)),
                       ]),
                     ],
                   ),

@@ -20,7 +20,7 @@ class StarRating extends StatelessWidget {
           onPressed: onChanged == null ? null : () => onChanged!(starValue),
           icon: Icon(
             filled ? Icons.star : Icons.star_border,
-            color: AppColors.accent,
+            color: context.palette.accent,
             size: size,
           ),
           tooltip: '$starValue од',

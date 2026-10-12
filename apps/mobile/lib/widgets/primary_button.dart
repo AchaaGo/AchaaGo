@@ -26,11 +26,11 @@ class PrimaryButton extends StatelessWidget {
       style: accent ? accentButtonStyle : null,
       onPressed: busy ? null : onPressed,
       child: busy
-          ? const SizedBox(
+          ? SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(
-                  strokeWidth: 2.4, color: AppColors.ink),
+                  strokeWidth: 2.4, color: context.palette.onBrand),
             )
           : Text(label),
     );

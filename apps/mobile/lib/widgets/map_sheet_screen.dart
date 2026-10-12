@@ -24,6 +24,7 @@ class MapSheetScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     if (header != null) {
       return SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -33,12 +34,12 @@ class MapSheetScreen extends StatelessWidget {
             header!,
             SizedBox(height: backgroundHeight, child: background),
             DecoratedBox(
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
+              decoration: BoxDecoration(
+                color: p.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: const [
                   BoxShadow(
-                      color: Color(0x2414213D),
+                      color: sheetShadowColor,
                       blurRadius: 28,
                       offset: Offset(0, -8))
                 ],
@@ -60,9 +61,9 @@ class MapSheetScreen extends StatelessWidget {
         SizedBox(height: backgroundHeight, child: background),
         Expanded(
           child: DecoratedBox(
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),

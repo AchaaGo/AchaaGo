@@ -9,10 +9,11 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return ColoredBox(
-      color: dark ? AppColors.ink : Colors.transparent,
+      color: dark ? p.solidInk : Colors.transparent,
       child: Center(
-        child: CircularProgressIndicator(color: dark ? AppColors.accent : AppColors.ink),
+        child: CircularProgressIndicator(color: p.accent),
       ),
     );
   }

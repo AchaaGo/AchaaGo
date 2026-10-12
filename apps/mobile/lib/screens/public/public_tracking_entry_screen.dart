@@ -49,7 +49,7 @@ class _PublicTrackingEntryScreenState extends State<PublicTrackingEntryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(Strings.publicTrackingHint, style: TextStyle(color: AppColors.muted)),
+              Text(Strings.publicTrackingHint, style: TextStyle(color: context.palette.muted)),
               const SizedBox(height: 12),
               TextField(
                 controller: _controller,

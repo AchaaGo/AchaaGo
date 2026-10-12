@@ -4,8 +4,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../core/route_polyline.dart';
 import '../models/point.dart';
 import '../theme/app_theme.dart';
+import '../theme/map_style.dart';
 
 const _ulaanbaatarCenter = LatLng(47.9186, 106.9177);
+
+/// The route line is the same navy in both themes, as on the web map: the
+/// white casing keeps it readable on the dark map too.
+const _routeColor = Color(0xFF14213D);
 
 LatLng _toLatLng(GeoPoint point) => LatLng(point.lat, point.lng);
 
@@ -154,7 +159,7 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
         Polyline(
           polylineId: const PolylineId('route'),
           points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
-          color: AppColors.ink,
+          color: _routeColor,
           width: 5,
         ),
       ],
@@ -166,12 +171,13 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           circleId: const CircleId('pulse'),
           center: _toLatLng(pickup),
           radius: 40 + pulseFraction * 60,
-          fillColor: AppColors.accent.withValues(alpha: 0.35 * (1 - pulseFraction)),
+          fillColor: context.palette.accent.withValues(alpha: 0.35 * (1 - pulseFraction)),
           strokeWidth: 0,
         ),
     };
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: pickup != null ? _toLatLng(pickup) : _ulaanbaatarCenter, zoom: 14),
+      style: Theme.of(context).brightness == Brightness.dark ? darkMapStyle : lightMapStyle,
       onMapCreated: (controller) {
         _controller = controller;
         _fitBounds();

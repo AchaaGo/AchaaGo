@@ -45,6 +45,8 @@ class Strings {
   static const menuBecomeDriver = 'Жолооч болох';
   static const menuTrackByLink = 'Захиалгын явц хянах';
   static const menuLogout = 'Гарах';
+  static const themeSwitchToLight = 'Гэгээтэй горимд шилжих';
+  static const themeSwitchToDark = 'Харанхуй горимд шилжих';
   static const menuProfile = 'Профайл';
 
   // Route / quote screen

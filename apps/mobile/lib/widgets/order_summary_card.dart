@@ -16,18 +16,19 @@ class OrderSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final paymentLabel = order.paymentMethod == 'qpay' ? Strings.payQpay : Strings.payCash;
     final loaderSuffix = (order.loaders ?? 0) > 0 ? ' + ачигч' : '';
+    final p = context.palette;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.ground, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: p.ground, borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _AddressRow(dot: true, text: order.pickup.address),
           const SizedBox(height: 10),
           _AddressRow(dot: false, text: order.dropoff.address),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1, color: AppColors.line),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Divider(height: 1, color: p.line),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -35,7 +36,7 @@ class OrderSummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${order.serviceName}$loaderSuffix · $paymentLabel',
-                  style: const TextStyle(color: AppColors.muted),
+                  style: TextStyle(color: p.muted),
                 ),
               ),
               if (order.totalPrice != null)
@@ -56,17 +57,18 @@ class _AddressRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 5),
           child: dot
-              ? const CircleAvatar(radius: 5, backgroundColor: AppColors.ink)
+              ? CircleAvatar(radius: 5, backgroundColor: p.ink)
               : Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(color: AppColors.accent, border: Border.all(color: AppColors.ink, width: 2)),
+                  decoration: BoxDecoration(color: p.accent, border: Border.all(color: p.ink, width: 2)),
                 ),
         ),
         const SizedBox(width: 10),

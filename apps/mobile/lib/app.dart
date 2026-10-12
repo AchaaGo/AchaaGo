@@ -15,6 +15,14 @@ class AchaaGoApp extends StatefulWidget {
 
 class _AchaaGoAppState extends State<AchaaGoApp> {
   final AppState _appState = AppState();
+  final ThemeData _lightTheme = buildAppTheme(Brightness.light);
+  final ThemeData _darkTheme = buildAppTheme(Brightness.dark);
+
+  @override
+  void initState() {
+    super.initState();
+    _appState.loadThemeMode();
+  }
 
   @override
   void dispose() {
@@ -26,11 +34,16 @@ class _AchaaGoAppState extends State<AchaaGoApp> {
   Widget build(BuildContext context) {
     return AppScope(
       state: _appState,
-      child: MaterialApp(
-        title: AppConfig.brandName,
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const SplashScreen(),
+      child: ListenableBuilder(
+        listenable: _appState,
+        builder: (context, _) => MaterialApp(
+          title: AppConfig.brandName,
+          debugShowCheckedModeBanner: false,
+          theme: _lightTheme,
+          darkTheme: _darkTheme,
+          themeMode: _appState.themeMode,
+          home: const SplashScreen(),
+        ),
       ),
     );
   }

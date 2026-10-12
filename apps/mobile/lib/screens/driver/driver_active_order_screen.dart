@@ -137,7 +137,7 @@ class _DriverActiveOrderScreenState extends State<DriverActiveOrderScreen> {
           ];
         }
         return [
-          const Text(Strings.driverWaitingForQpay, style: TextStyle(color: AppColors.muted), textAlign: TextAlign.center),
+          Text(Strings.driverWaitingForQpay, style: TextStyle(color: context.palette.muted), textAlign: TextAlign.center),
           const SizedBox(height: 10),
           OutlinedButton(
             onPressed: _busy

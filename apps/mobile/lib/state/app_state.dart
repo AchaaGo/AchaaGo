@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 
 import '../core/api_client.dart';
 import '../core/session_store.dart';
@@ -36,6 +37,28 @@ class AppState extends ChangeNotifier {
 
   AuthStatus status = AuthStatus.unknown;
   AppUser? user;
+
+  /// Follows the device setting until the customer picks light or dark with
+  /// the theme toggle; that choice is then remembered.
+  ThemeMode themeMode = ThemeMode.system;
+
+  Future<void> loadThemeMode() async {
+    final saved = await sessionStore.readThemePreference();
+    final mode = switch (saved) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+    if (mode == themeMode) return;
+    themeMode = mode;
+    notifyListeners();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    themeMode = mode;
+    notifyListeners();
+    await sessionStore.saveThemePreference(mode == ThemeMode.dark ? 'dark' : 'light');
+  }
 
   /// Runs once at startup: is there a stored session, and is it still
   /// valid against the backend (`GET /auth/me`)?

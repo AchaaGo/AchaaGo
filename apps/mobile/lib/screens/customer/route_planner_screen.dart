@@ -18,6 +18,7 @@ import '../../widgets/error_banner.dart';
 import '../../widgets/live_map_view.dart';
 import '../../widgets/map_sheet_screen.dart';
 import '../../widgets/primary_button.dart';
+import '../../widgets/theme_toggle_button.dart';
 import 'finding_driver_screen.dart';
 import 'order_tracking_screen.dart';
 
@@ -343,6 +344,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final selectedPrice = _quote?.priceFor(_selectedServiceId);
     return Scaffold(
       body: SafeArea(
@@ -367,7 +369,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 if (_quote != null)
                   Text(
                       '${_quote!.distanceKm.toStringAsFixed(1)} км · ~${_quote!.durationMinutes} мин',
-                      style: const TextStyle(color: AppColors.muted)),
+                      style: TextStyle(color: p.muted)),
               ],
             ),
             const SizedBox(height: 10),
@@ -383,7 +385,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               contentPadding: EdgeInsets.zero,
               value: _loaders > 0,
               onChanged: _busy ? null : _toggleLoader,
-              activeThumbColor: AppColors.ink,
+              activeThumbColor: p.onBrand,
               title: const Text(Strings.addLoader,
                   style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text('+${formatMoney(_quote?.loaderRate ?? 25000)}'),
@@ -430,7 +432,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                       ? Strings.needsPickup
                       : Strings.dropoffRequiredHint,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                  style: TextStyle(color: p.muted, fontSize: 13),
                 ),
               ),
           ],
@@ -443,7 +445,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final editingPickup = _editingTarget == 'pickup';
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      color: AppColors.surface,
+      color: context.palette.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -463,9 +465,11 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                           .textTheme
                           .titleLarge
                           ?.copyWith(fontWeight: FontWeight.w700)),
-                  const Text(Strings.routeSearchHelp,
-                      style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                  Text(Strings.routeSearchHelp,
+                      style: TextStyle(
+                          color: context.palette.muted, fontSize: 13)),
                 ])),
+            const ThemeToggleButton(),
           ]),
           const SizedBox(height: 12),
           Row(children: [
@@ -532,10 +536,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               !_searching &&
               _suggestions.isEmpty &&
               _error == null)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
               child: Text(Strings.searchPlacesEmpty,
-                  style: TextStyle(color: AppColors.muted)),
+                  style: TextStyle(color: context.palette.muted)),
             ),
         ],
       ),
@@ -583,13 +587,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: address == null ? AppColors.muted : null),
+                    color: address == null ? context.palette.muted : null),
               ),
             ),
             const SizedBox(width: 8),
-            const Text(Strings.changeAddress,
+            Text(Strings.changeAddress,
                 style: TextStyle(
-                    color: AppColors.accent,
+                    color: context.palette.ink,
+                    decoration: TextDecoration.underline,
                     fontWeight: FontWeight.w600,
                     fontSize: 13)),
           ],
@@ -607,14 +612,14 @@ class _AddressRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final marker = dot
-        ? const CircleAvatar(radius: 5, backgroundColor: AppColors.ink)
+        ? CircleAvatar(radius: 5, backgroundColor: p.ink)
         : Container(
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-                color: AppColors.accent,
-                border: Border.all(color: AppColors.ink, width: 2)),
+                color: p.accent, border: Border.all(color: p.ink, width: 2)),
           );
     return Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -632,14 +637,14 @@ class _AddressTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(48),
-        backgroundColor: selected ? AppColors.accentSoft : AppColors.surface,
+        backgroundColor: selected ? p.accentSoft : p.surface,
         side: BorderSide(
-            color: selected ? AppColors.accent : AppColors.line,
-            width: selected ? 2 : 1),
+            color: selected ? p.accent : p.line, width: selected ? 2 : 1),
       ),
       child: Text(label, textAlign: TextAlign.center),
     );
@@ -656,6 +661,7 @@ class _ServicePriceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -664,21 +670,21 @@ class _ServicePriceRow extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? AppColors.accentSoft : Colors.white,
+            color: selected ? p.accentSoft : p.surface,
             border: Border.all(
-                color: selected ? AppColors.accent : AppColors.line, width: 2),
+                color: selected ? p.accent : p.line, width: 2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: AppColors.inkDeep,
+                backgroundColor: p.inkDeep,
                 child: Icon(
                   price.service.icon == 'package'
                       ? Icons.inventory_2_outlined
                       : Icons.local_shipping_outlined,
-                  color: AppColors.mint,
+                  color: p.mint,
                 ),
               ),
               const SizedBox(width: 11),
@@ -689,8 +695,7 @@ class _ServicePriceRow extends StatelessWidget {
                     Text(price.service.nameMn,
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     Text(price.service.descriptionMn,
-                        style: const TextStyle(
-                            color: AppColors.muted, fontSize: 12)),
+                        style: TextStyle(color: p.muted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -714,14 +719,15 @@ class _PaymentOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          backgroundColor: selected ? AppColors.accentSoft : Colors.white,
+          backgroundColor: selected ? p.accentSoft : p.surface,
           side: BorderSide(
-              color: selected ? AppColors.accent : AppColors.line, width: 2),
+              color: selected ? p.accent : p.line, width: 2),
         ),
         child: Text(label),
       ),

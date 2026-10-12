@@ -151,6 +151,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => const PublicTrackingEntryScreen()));
         break;
+      case 'theme':
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        await appState.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark);
+        break;
       case 'logout':
         final confirmed = await showDialog<bool>(
           context: context,
@@ -181,6 +185,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = AppScope.of(context);
+    final p = context.palette;
     return Scaffold(
       body: Stack(
         children: [
@@ -205,6 +210,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             child: Text(Strings.menuCurrentOrder)),
                       const PopupMenuItem(
                           value: 'track', child: Text(Strings.menuTrackByLink)),
+                      PopupMenuItem(
+                          value: 'theme',
+                          child: Text(Theme.of(context).brightness ==
+                                  Brightness.dark
+                              ? Strings.themeSwitchToLight
+                              : Strings.themeSwitchToDark)),
                       if (!(appState.user?.isDriver ?? false))
                         const PopupMenuItem(
                             value: 'become_driver',
@@ -213,13 +224,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           value: 'logout', child: Text(Strings.menuLogout)),
                     ],
                     tooltip: 'Профайл',
-                    color: AppColors.surface,
+                    color: p.surface,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       radius: 25,
-                      backgroundColor: AppColors.surface,
-                      child: Icon(Icons.person_outline, color: AppColors.ink),
+                      backgroundColor: p.surface,
+                      child: Icon(Icons.person_outline, color: p.ink),
                     ),
                   ),
                 ],
@@ -230,28 +241,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             alignment: Alignment.bottomCenter,
             child: Container(
               height: MediaQuery.sizeOf(context).height * 0.55,
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
+              decoration: BoxDecoration(
+                color: p.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: const [
                   BoxShadow(
-                      color: Color(0x2414213D),
+                      color: sheetShadowColor,
                       blurRadius: 28,
                       offset: Offset(0, -8))
                 ],
               ),
               child: Column(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
                     child: SizedBox(
                         width: 40,
                         height: 5,
                         child: DecoratedBox(
                             decoration: BoxDecoration(
-                                color: Color(0xFFD9D3C6),
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(3))))),
+                                color: p.lineStrong,
+                                borderRadius: const BorderRadius.all(
+                                    Radius.circular(3))))),
                   ),
                   Expanded(
                       child: RefreshIndicator(
@@ -270,18 +282,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       {required IconData icon,
       required String tooltip,
       required VoidCallback onPressed}) {
+    final p = context.palette;
     return Material(
-      color: AppColors.surface,
+      color: p.surface,
       elevation: 4,
       shape: const CircleBorder(),
       child: IconButton(
-          icon: Icon(icon, color: AppColors.ink),
+          icon: Icon(icon, color: p.ink),
           tooltip: tooltip,
           onPressed: onPressed),
     );
   }
 
   void _showMenu(BuildContext context, AppState appState) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -313,6 +327,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     _handleMenu('become_driver');
                   }),
             ListTile(
+                leading: Icon(
+                    dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                title: Text(dark
+                    ? Strings.themeSwitchToLight
+                    : Strings.themeSwitchToDark),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _handleMenu('theme');
+                }),
+            ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text(Strings.menuLogout),
                 onTap: () {
@@ -338,7 +362,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       children: [
         Text(Strings.greeting(name),
-            style: const TextStyle(color: AppColors.muted)),
+            style: TextStyle(color: context.palette.muted)),
         const SizedBox(height: 4),
         Text(Strings.homeHeading,
             style: Theme.of(context).textTheme.headlineSmall),
@@ -381,13 +405,13 @@ class _CurrentOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      color: AppColors.accentSoft,
+      color: p.accentSoft,
       child: ListTile(
         onTap: onTap,
-        leading:
-            const Icon(Icons.local_shipping_outlined, color: AppColors.ink),
+        leading: Icon(Icons.local_shipping_outlined, color: p.ink),
         title: const Text(Strings.menuCurrentOrder,
             style: TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(describeStatus(order.status)),
@@ -405,14 +429,15 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: AppColors.ground,
-          border: Border.all(color: AppColors.line, width: 2),
+          color: p.ground,
+          border: Border.all(color: p.line, width: 2),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -420,12 +445,12 @@ class _ServiceCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 25,
-              backgroundColor: AppColors.inkDeep,
+              backgroundColor: p.inkDeep,
               child: Icon(
                 service.icon == 'package'
                     ? Icons.inventory_2_outlined
                     : Icons.local_shipping_outlined,
-                color: AppColors.mint,
+                color: p.mint,
               ),
             ),
             const SizedBox(height: 9),
@@ -435,7 +460,7 @@ class _ServiceCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               service.descriptionMn,
-              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+              style: TextStyle(color: p.muted, fontSize: 13),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

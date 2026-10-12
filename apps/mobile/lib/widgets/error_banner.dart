@@ -12,11 +12,12 @@ class ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message == null || message!.isEmpty) return const SizedBox.shrink();
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: Semantics(
         liveRegion: true,
-        child: Text(message!, style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+        child: Text(message!, style: TextStyle(color: p.error, fontWeight: FontWeight.w600)),
       ),
     );
   }

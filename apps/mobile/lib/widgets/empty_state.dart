@@ -21,14 +21,15 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 40, color: AppColors.muted),
+          Icon(icon, size: 40, color: p.muted),
           const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted)),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(color: p.muted)),
           if (onRetry != null) ...[
             const SizedBox(height: 16),
             SizedBox(

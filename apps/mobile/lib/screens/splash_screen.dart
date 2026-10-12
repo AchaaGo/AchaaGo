@@ -35,6 +35,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(backgroundColor: AppColors.ink, body: LoadingView(dark: true));
+    return Scaffold(backgroundColor: context.palette.solidInk, body: const LoadingView(dark: true));
   }
 }

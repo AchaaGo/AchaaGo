@@ -1,4 +1,5 @@
 import 'package:achaago_mobile/screens/login/phone_entry_screen.dart';
+import 'package:achaago_mobile/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,5 +48,26 @@ void main() {
     await tester.pump();
 
     expect(find.text('9911 2233'), findsOneWidget);
+  });
+
+  testWidgets('renders the dark-green header and the theme toggle in the dark theme',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildAppTheme(Brightness.dark),
+      home: const PhoneEntryScreen(),
+    ));
+
+    expect(tester.takeException(), isNull);
+    // The dark theme offers to switch back to light.
+    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+    final headers = tester.widgetList<Container>(find.byType(Container)).where((box) {
+      final decoration = box.decoration;
+      return decoration is BoxDecoration &&
+          decoration.color == AppPalette.dark.inkDeep &&
+          decoration.border is Border &&
+          (decoration.border! as Border).bottom.color == AppPalette.dark.accent &&
+          (decoration.border! as Border).bottom.width == 4;
+    });
+    expect(headers, hasLength(1));
   });
 }

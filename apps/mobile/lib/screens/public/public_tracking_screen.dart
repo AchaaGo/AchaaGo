@@ -94,9 +94,10 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     }
     final order = _order;
     if (order == null) {
-      return const Scaffold(backgroundColor: AppColors.ink, body: LoadingView(dark: true));
+      return Scaffold(backgroundColor: context.palette.solidInk, body: const LoadingView(dark: true));
     }
     final driver = order.driver;
+    final p = context.palette;
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
@@ -111,7 +112,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: p.accentSoft, borderRadius: BorderRadius.circular(20)),
               child: Text(describeStatus(order.status), style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
             const SizedBox(height: 10),
@@ -123,10 +124,10 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                   padding: const EdgeInsets.all(14),
                   child: Row(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 24,
-                        backgroundColor: AppColors.ink,
-                        child: Icon(Icons.local_shipping, color: AppColors.accent),
+                        backgroundColor: p.solidInk,
+                        child: Icon(Icons.local_shipping, color: p.accent),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -135,7 +136,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                           children: [
                             Text(driver.name ?? '—', style: const TextStyle(fontWeight: FontWeight.w700)),
                             Row(children: [
-                              const Icon(Icons.star, size: 14, color: AppColors.accent),
+                              Icon(Icons.star, size: 14, color: p.accent),
                               const SizedBox(width: 4),
                               Text(driver.rating?.toStringAsFixed(1) ?? 'Шинэ'),
                             ]),
@@ -151,14 +152,14 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: AppColors.ground, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(color: p.ground, borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(Strings.pickupLabel, style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                  Text(Strings.pickupLabel, style: TextStyle(color: p.muted, fontSize: 12)),
                   Text(order.pickup.address),
                   const SizedBox(height: 10),
-                  const Text(Strings.dropoffLabel, style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                  Text(Strings.dropoffLabel, style: TextStyle(color: p.muted, fontSize: 12)),
                   Text(order.dropoff.address),
                   const SizedBox(height: 10),
                   Row(
@@ -172,9 +173,9 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               Strings.publicTrackingPrivacyNote,
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
+              style: TextStyle(color: p.muted, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],

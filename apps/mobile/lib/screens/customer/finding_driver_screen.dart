@@ -88,6 +88,7 @@ class _FindingDriverScreenState extends State<FindingDriverScreen> with OrderWat
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -103,11 +104,11 @@ class _FindingDriverScreenState extends State<FindingDriverScreen> with OrderWat
             children: [
               Text(Strings.findingHeading, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 6),
-              Text(Strings.findingSubtitle(_order.serviceName), style: const TextStyle(color: AppColors.muted)),
+              Text(Strings.findingSubtitle(_order.serviceName), style: TextStyle(color: p.muted)),
               const SizedBox(height: 16),
-              const ClipRRect(
-                borderRadius: BorderRadius.all(Radius.circular(3)),
-                child: LinearProgressIndicator(minHeight: 6, color: AppColors.accent, backgroundColor: AppColors.line),
+              ClipRRect(
+                borderRadius: const BorderRadius.all(Radius.circular(3)),
+                child: LinearProgressIndicator(minHeight: 6, color: p.accent, backgroundColor: p.line),
               ),
               const SizedBox(height: 18),
               OrderSummaryCard(order: _order),

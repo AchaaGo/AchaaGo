@@ -10,6 +10,7 @@ import '../../state/app_scope.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/primary_button.dart';
+import '../../widgets/theme_toggle_button.dart';
 import '../shared/role_gate_screen.dart';
 
 /// Screen 2 in AGENTS.md. A complete 4-digit code submits itself (iOS also
@@ -109,8 +110,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(actions: const [ThemeToggleButton()]),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -121,7 +123,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               const SizedBox(height: 6),
               Text(
                 Strings.otpSubtitle(formatPhoneDisplay(widget.localPhone)),
-                style: const TextStyle(color: AppColors.muted, height: 1.4),
+                style: TextStyle(color: p.muted, height: 1.4),
               ),
               const SizedBox(height: 24),
               TextField(
@@ -136,9 +138,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 onChanged: _onCodeChanged,
               ),
               if (_devOtp)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text(Strings.otpDevHint, style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(Strings.otpDevHint, style: TextStyle(color: p.muted, fontSize: 12)),
                 ),
               ErrorBanner(message: _error),
               const SizedBox(height: 8),

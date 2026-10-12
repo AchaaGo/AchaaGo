@@ -17,7 +17,7 @@ Read `AGENTS.md` first: it is the product spec. This report covers what is actua
 
 The driver side of the mobile app covers login, registration, going online and offline, and the active order: accept, status updates, cash received. Location updates are sent by a timer only while the driver screen is open.
 
-The mobile app still has the original navy and yellow palette from AGENTS.md §5 and no dark theme, so it no longer matches the web design.
+The mobile app uses the same brand palette and light/dark themes as the web (`lib/theme/app_theme.dart`; the theme follows the device unless the customer picks one, and the choice is saved). It does not have the web fonts (Unbounded, Golos Text) yet.
 
 Two things from AGENTS.md are not in the app yet:
 - **Push notifications:** the app has no Firebase and never calls `POST /driver/push-token`. The server side is ready.
@@ -225,6 +225,7 @@ Break one of these only on purpose, and change both clients together.
 
 | Commit | Change |
 |---|---|
+| mobile theme | The Flutter app gets the web's brand palette, a light and dark theme with a saved toggle, and the dark map style. Colours are read with `context.palette` instead of fixed constants. |
 | merge of `uiux/achaa-go-polish` | The dark design and its features (brand palette, light/dark themes, pickup selection, vehicle cards, draggable sheet, menu and profile panels, the inactive motorcycle service) merged into `main` together with the session, quote and request fixes below. Their six browser tests now run in CI. |
 | `05b158e` | Road-following routes on the web map instead of a straight line. |
 | `e8b67d7` | The phone-first home page lets a signed-in customer straight in. Before, every visit asked for a new SMS code. |
@@ -260,7 +261,7 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
 - **Background GPS for drivers** (AGENTS.md §3): location stops when the driver leaves the app.
 - **Automatic matching** (milestone 7): offer orders to the nearest online drivers (`drivers:geo` and PostGIS are already filled), with the dispatcher as fallback.
 - **Admin live map** of online drivers and open orders (§10.1). `GET /admin/drivers` already returns locations.
-- **Mobile design parity:** bring the brand palette and dark theme from the web to the Flutter app.
+- **Mobile fonts:** bundle TTF copies of Unbounded and Golos Text. The web's font packages only ship WOFF/WOFF2, which Flutter cannot use. The mobile app otherwise follows the web design (palette, themes, map style).
 - **Landing page** (milestone 8): `/` is currently the customer app.
 - **Optional web push** after ordering (§6).
 - **Floor/elevator pricing:** `floor_rate` is stored but unused. Scheduled orders: the `scheduled_for` column exists but nothing sets it.

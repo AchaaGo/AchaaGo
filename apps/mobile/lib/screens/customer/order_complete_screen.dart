@@ -49,6 +49,7 @@ class _OrderCompleteScreenState extends State<OrderCompleteScreen> {
   @override
   Widget build(BuildContext context) {
     final rated = _order.rating != null;
+    final p = context.palette;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -59,13 +60,13 @@ class _OrderCompleteScreenState extends State<OrderCompleteScreen> {
               Container(
                 width: 88,
                 height: 88,
-                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                child: const Icon(Icons.check, size: 48, color: AppColors.ink),
+                decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
+                child: Icon(Icons.check, size: 48, color: p.onBrand),
               ),
               const SizedBox(height: 20),
               Text(Strings.deliveredHeading, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
               const SizedBox(height: 6),
-              const Text(Strings.deliveredSubtitle, style: TextStyle(color: AppColors.muted), textAlign: TextAlign.center),
+              Text(Strings.deliveredSubtitle, style: TextStyle(color: p.muted), textAlign: TextAlign.center),
               const SizedBox(height: 20),
               OrderSummaryCard(order: _order),
               const SizedBox(height: 22),
@@ -73,9 +74,9 @@ class _OrderCompleteScreenState extends State<OrderCompleteScreen> {
               const SizedBox(height: 4),
               StarRating(value: _order.rating ?? 0, onChanged: (_busy || rated) ? null : _rate),
               if (rated)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text(Strings.thanksForRating, style: TextStyle(color: AppColors.muted)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(Strings.thanksForRating, style: TextStyle(color: p.muted)),
                 ),
               ErrorBanner(message: _error),
               const SizedBox(height: 24),
