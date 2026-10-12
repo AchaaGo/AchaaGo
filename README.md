@@ -2,6 +2,8 @@
 
 Mobile-first truck ordering for Ulaanbaatar. The repository contains a Next.js customer/admin web app and an async FastAPI API with PostgreSQL/PostGIS, Redis, Celery, WebSockets, QPay and provider interfaces.
 
+`AGENTS.md` is the product spec. [`docs/HANDOFF.md`](docs/HANDOFF.md) describes what is built, the contracts between the apps and the API, and the open work.
+
 ## Start
 
 ```bash
