@@ -128,10 +128,13 @@ async def test_google_reverse_geocode_with_a_refused_key_warns_the_operator(monk
     assert "test-key" not in caplog.text
 
 
-async def test_google_reverse_geocode_http_failure_surfaces_as_a_provider_error(monkeypatch):
+async def test_google_reverse_geocode_http_failure_surfaces_as_a_provider_error_without_the_key(monkeypatch):
     maps = google(monkeypatch, lambda request: httpx.Response(500))
-    with pytest.raises(httpx.HTTPError):  # main.provider_error turns this into 503 PROVIDER_UNAVAILABLE
+    with pytest.raises(httpx.HTTPError) as error:  # main.provider_error turns this into 503 PROVIDER_UNAVAILABLE
         await maps.reverse(47.9186, 106.9177)
+    assert "500" in str(error.value)
+    assert "test-key" not in str(error.value)  # the Geocoding API takes its key in the URL
+    assert error.value.__cause__ is None and error.value.__suppress_context__
 
 
 async def test_demo_maps_have_no_addresses_to_reverse():

@@ -184,7 +184,11 @@ class GoogleMaps(MapsProvider):
         async with self.client(10) as client:
             response = await client.get("https://maps.googleapis.com/maps/api/geocode/json", params={
                 "latlng": f"{lat},{lng}", "language": PLACES_LANGUAGE, "key": settings.google_maps_api_key})
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                # The error text would carry the URL, and this API takes its key in the URL.
+                raise httpx.HTTPError(f"Geocoding API answered HTTP {error.response.status_code}") from None
         data = response.json()
         results = data.get("results") or []
         if data.get("status") == "OK" and results and results[0].get("formatted_address"):
