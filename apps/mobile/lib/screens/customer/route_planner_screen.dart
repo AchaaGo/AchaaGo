@@ -6,8 +6,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/formatting.dart';
+import '../../core/place_session.dart';
 import '../../core/search_revision.dart';
 import '../../l10n/strings.dart';
+import '../../models/order.dart';
 import '../../models/point.dart';
 import '../../models/quote.dart';
 import '../../models/service.dart';
@@ -27,12 +29,27 @@ const _ulaanbaatarCenter =
 
 /// Screen 4 in AGENTS.md: pickup/drop-off, vehicle + loader + payment
 /// selection, and the server-priced order button.
+///
+/// The address, map and quote behaviour follows apps/web's CustomerFlow.tsx:
+/// one search field for whichever address is being edited, a Places billing
+/// session per typing session, map taps and "current location" resolved to a
+/// street address, a quote requested only once both addresses are settled,
+/// and a device fix that arrives late never overwrites a pickup the customer
+/// chose.
 class RoutePlannerScreen extends StatefulWidget {
-  const RoutePlannerScreen(
-      {super.key, required this.initialServiceId, required this.services});
+  const RoutePlannerScreen({
+    super.key,
+    required this.initialServiceId,
+    required this.services,
+    this.initialPickup,
+  });
 
   final String initialServiceId;
   final List<ServiceOption> services;
+
+  /// The device position the home screen already found; when null the
+  /// planner asks for the position itself.
+  final GeoPoint? initialPickup;
 
   @override
   State<RoutePlannerScreen> createState() => _RoutePlannerScreenState();
@@ -42,12 +59,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
   final _searchRevision = SearchRevision();
+  final _placeSession = PlaceSession();
   bool _searching = false;
   bool _searched = false;
 
   final _searchFocusNode = FocusNode();
 
-  GeoPoint _pickup = _ulaanbaatarCenter;
+  late GeoPoint _pickup = widget.initialPickup ?? _ulaanbaatarCenter;
   GeoPoint? _dropoff;
 
   /// Which row the shared search field currently edits.
@@ -59,8 +77,16 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   /// `pickupReady` gate apps/web's CustomerFlow.tsx added.
   bool _pickupPending = false;
 
+  /// Set once the customer works on the pickup; from then on a late device
+  /// fix must not replace it (web's `pickupTouched`).
+  bool _pickupTouched = false;
+
   List<PlaceSuggestion> _suggestions = const [];
   Quote? _quote;
+
+  /// Numbers each quote request so a slower, older answer never replaces a
+  /// newer one (for example when a late device fix triggers a requote).
+  int _quoteRevision = 0;
   late String _selectedServiceId = widget.initialServiceId;
   int _loaders = 0;
   String _paymentMethod = 'qpay';
@@ -70,42 +96,55 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   @override
   void initState() {
     super.initState();
-    _resolvePickup();
+    if (widget.initialPickup == null) _resolvePickup();
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchRevision.next();
+    _quoteRevision++;
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _resolvePickup() async {
+  /// The device position, or null when location is off, denied or too slow.
+  Future<Position?> _devicePosition(
+      {Duration timeLimit = const Duration(seconds: 6)}) async {
     try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) return;
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        return;
+        return null;
       }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
+      return await Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.medium, timeLimit: timeLimit),
       );
-      if (!mounted) return;
-      setState(() => _pickup = GeoPoint(
-          lat: position.latitude,
-          lng: position.longitude,
-          address: Strings.currentLocation));
     } catch (_) {
       // Keep the Ulaanbaatar-center fallback — matches the web app's
       // silent geolocation catch in CustomerFlow.tsx.
+      return null;
+    }
+  }
+
+  Future<void> _resolvePickup() async {
+    final position = await _devicePosition();
+    if (position == null || !mounted || _pickupTouched) return;
+    setState(() => _pickup = GeoPoint(
+        lat: position.latitude,
+        lng: position.longitude,
+        address: Strings.currentLocation));
+    // The customer may already have chosen a destination while the fix was
+    // coming in: price the real pickup, not the city-centre placeholder.
+    if (_dropoff != null) {
+      setState(() => _quote = null);
+      await _requote(AppScope.of(context));
     }
   }
 
@@ -113,6 +152,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final query = value.trim();
     final revision = _searchRevision.next();
     _debounce?.cancel();
+    if (_editingTarget == 'pickup') _pickupTouched = true;
     setState(() {
       _quote = null;
       _suggestions = const [];
@@ -125,12 +165,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         _dropoff = null;
       }
     });
-    if (query.length < 3) return;
+    if (query.length < 3) {
+      _placeSession.end();
+      return;
+    }
+    final session = _placeSession.token;
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       if (!mounted || !_searchRevision.isCurrent(revision)) return;
       final appState = AppScope.of(context);
       try {
-        final results = await appState.customerRepository.searchPlaces(query);
+        final results = await appState.customerRepository
+            .searchPlaces(query, session: session);
         if (mounted && _searchRevision.isCurrent(revision)) {
           setState(() {
             _suggestions = results;
@@ -157,6 +202,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     if (_busy) return;
     _debounce?.cancel();
     _searchRevision.next();
+    _placeSession.end();
+    if (target == 'pickup') _pickupTouched = true;
     setState(() {
       _editingTarget = target;
       _suggestions = const [];
@@ -164,10 +211,31 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _searched = false;
       _error = null;
       _searchController.text = target == 'pickup'
-          ? (_pickup.address == Strings.currentLocation ? '' : _pickup.address)
+          ? (_pickupPending || _pickup.address == Strings.currentLocation
+              ? ''
+              : _pickup.address)
           : (_dropoff?.address ?? '');
     });
     _searchFocusNode.requestFocus();
+  }
+
+  /// Settles the edited address on [place] and prices the route.
+  Future<void> _applyPlace(GeoPoint place) async {
+    setState(() {
+      if (_editingTarget == 'pickup') {
+        _pickup = place;
+        _pickupPending = false;
+        _pickupTouched = true;
+      } else {
+        _dropoff = place;
+      }
+      _searchController.text = place.address;
+      _suggestions = const [];
+      _searching = false;
+      _searched = false;
+      _quote = null;
+    });
+    await _requote(AppScope.of(context));
   }
 
   Future<void> _pickPlace(PlaceSuggestion suggestion) async {
@@ -179,101 +247,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _error = null;
     });
     try {
-      final place = await appState.customerRepository.place(suggestion.id);
+      // The lookup spends the search session's token, which ends the session.
+      final place = await appState.customerRepository
+          .place(suggestion.id, session: _placeSession.current);
       if (!mounted) return;
-      setState(() {
-        if (_editingTarget == 'pickup') {
-          _pickup = place;
-          _pickupPending = false;
-        } else {
-          _dropoff = place;
-        }
-        _searchController.text = place.address;
-        _suggestions = const [];
-        _searching = false;
-        _searched = false;
-      });
+      _placeSession.end();
       _searchFocusNode.unfocus();
-      await _requote(appState);
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _pickOnMap(LatLng location) async {
-    if (_busy) return;
-    _debounce?.cancel();
-    _searchRevision.next();
-    _searchFocusNode.unfocus();
-    setState(() {
-      _editingTarget = 'dropoff';
-      _suggestions = const [];
-      _searching = false;
-      _searched = false;
-      _dropoff = GeoPoint(
-        lat: location.latitude,
-        lng: location.longitude,
-        address: Strings.mapSelectedPoint,
-      );
-      _searchController.text = Strings.mapSelectedPoint;
-      _quote = null;
-      _error = null;
-    });
-    await _requote(AppScope.of(context));
-  }
-
-  Future<void> _useCurrentLocationForPickup() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-      _quote = null;
-      _suggestions = const [];
-    });
-    try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      var permission = enabled
-          ? await Geolocator.checkPermission()
-          : LocationPermission.denied;
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (!enabled ||
-          permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw Exception('location unavailable');
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
-      );
-      if (!mounted) return;
-      final place = GeoPoint(
-          lat: position.latitude,
-          lng: position.longitude,
-          address: Strings.currentLocation);
-      setState(() {
-        _pickup = place;
-        _pickupPending = false;
-        _searchController.text = place.address;
-      });
-      await _requote(AppScope.of(context));
-    } catch (_) {
-      if (mounted) setState(() => _error = Strings.locationFailed);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _requote(AppState appState) async {
-    final dropoff = _dropoff;
-    if (dropoff == null || _pickupPending) return;
-    setState(() => _busy = true);
-    try {
-      final quote = await appState.customerRepository
-          .quote(pickup: _pickup, dropoff: dropoff, loaders: _loaders);
-      if (mounted) setState(() => _quote = quote);
+      await _applyPlace(place);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -281,9 +261,110 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     }
   }
 
+  /// A tap on the map sets whichever address is being edited, as on the web,
+  /// labelled with its street address when the server can find one.
+  Future<void> _pickOnMap(LatLng location) async {
+    if (_busy) return;
+    _debounce?.cancel();
+    _searchRevision.next();
+    _placeSession.end();
+    _searchFocusNode.unfocus();
+    final appState = AppScope.of(context);
+    setState(() {
+      _suggestions = const [];
+      _searching = false;
+      _searched = false;
+      _quote = null;
+      _error = null;
+      _busy = true;
+    });
+    try {
+      final address = await appState.customerRepository
+          .reverseGeocode(location.latitude, location.longitude);
+      if (!mounted) return;
+      await _applyPlace(GeoPoint(
+        lat: location.latitude,
+        lng: location.longitude,
+        address: address ?? Strings.mapSelectedPoint,
+      ));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _useCurrentLocationForPickup() async {
+    if (_busy) return;
+    _debounce?.cancel();
+    _searchRevision.next();
+    _placeSession.end();
+    final appState = AppScope.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+      _quote = null;
+      _suggestions = const [];
+      _searching = false;
+      _searched = false;
+    });
+    try {
+      final position =
+          await _devicePosition(timeLimit: const Duration(seconds: 10));
+      if (!mounted) return;
+      if (position == null) {
+        setState(() => _error = Strings.locationFailed);
+        return;
+      }
+      final address = await appState.customerRepository
+          .reverseGeocode(position.latitude, position.longitude);
+      if (!mounted) return;
+      await _applyPlace(GeoPoint(
+        lat: position.latitude,
+        lng: position.longitude,
+        address: address ?? Strings.currentLocation,
+      ));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Prices the settled route. A failure clears the quote (the order button
+  /// stays off and "retry" appears) rather than leaving a stale price.
+  Future<void> _requote(AppState appState) async {
+    final dropoff = _dropoff;
+    if (dropoff == null || _pickupPending) return;
+    final pickup = _pickup;
+    final revision = ++_quoteRevision;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final quote = await appState.customerRepository
+          .quote(pickup: pickup, dropoff: dropoff, loaders: _loaders);
+      if (mounted && revision == _quoteRevision) setState(() => _quote = quote);
+    } on ApiException catch (e) {
+      if (mounted && revision == _quoteRevision) {
+        setState(() {
+          _quote = null;
+          _error = e.message;
+        });
+      }
+    } finally {
+      if (mounted && revision == _quoteRevision) setState(() => _busy = false);
+    }
+  }
+
   void _toggleLoader(bool value) {
     setState(() => _loaders = value ? 1 : 0);
     _requote(AppScope.of(context));
+  }
+
+  void _openOrder(Order order) {
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (_) => order.status == 'assigned'
+          ? OrderTrackingScreen(initialOrder: order)
+          : FindingDriverScreen(initialOrder: order),
+    ));
   }
 
   Future<void> _placeOrder() async {
@@ -309,12 +390,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         quoteToken: quote.quoteToken,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => order.status == 'assigned'
-            ? OrderTrackingScreen(initialOrder: order)
-            : FindingDriverScreen(initialOrder: order),
-      ));
+      _openOrder(order);
     } on ApiException catch (e) {
+      if (e.code == 'ACTIVE_ORDER_EXISTS') {
+        // Already ordered (another device, or a lost response): go to that
+        // order, as the web does, instead of leaving the customer stuck here.
+        final active = await _activeOrder(appState);
+        if (active != null && mounted) {
+          _openOrder(active);
+          return;
+        }
+      }
       if (e.code == 'QUOTE_CHANGED') {
         await _requote(appState);
       }
@@ -322,6 +408,19 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<Order?> _activeOrder(AppState appState) async {
+    try {
+      final orders = await appState.customerRepository.myOrders();
+      for (final order in orders) {
+        if (order.isActive) return order;
+      }
+    } catch (_) {
+      // Looking up the current order is a convenience; the error message
+      // already tells the customer they have one.
+    }
+    return null;
   }
 
   List<ServicePrice> get _displayPrices {
@@ -346,6 +445,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final selectedPrice = _quote?.priceFor(_selectedServiceId);
+    final canRetryQuote =
+        !_pickupPending && _dropoff != null && _quote == null && !_busy;
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
@@ -355,8 +456,11 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             pickup: _pickupPending ? null : _pickup,
             dropoff: _dropoff,
             routePolyline: _quote?.polyline,
-            showRoute: !_pickupPending && _dropoff != null,
+            // Only once priced, like the web: an unpriced pair has no route.
+            showRoute: !_pickupPending && _dropoff != null && _quote != null,
             onPick: _pickOnMap,
+            onRetryRoute:
+                _busy ? null : () => _requote(AppScope.of(context)),
           ),
           header: _buildRouteHeader(),
           children: [
@@ -411,6 +515,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             ),
             ErrorBanner(message: _error),
             const SizedBox(height: 8),
+            if (canRetryQuote)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  onPressed: () => _requote(AppScope.of(context)),
+                  child: const Text(Strings.retryQuote),
+                ),
+              ),
             PrimaryButton(
               accent: true,
               busy: _busy,
@@ -424,13 +536,15 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   ? null
                   : _placeOrder,
             ),
-            if (_pickupPending || _dropoff == null)
+            if (_pickupPending || _dropoff == null || (_quote == null && !_busy))
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   _pickupPending
                       ? Strings.needsPickup
-                      : Strings.dropoffRequiredHint,
+                      : _dropoff == null
+                          ? Strings.dropoffRequiredHint
+                          : Strings.needsQuote,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: p.muted, fontSize: 13),
                 ),
@@ -443,6 +557,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
   Widget _buildRouteHeader() {
     final editingPickup = _editingTarget == 'pickup';
+    final queryLength = _searchController.text.trim().length;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       color: context.palette.surface,
@@ -513,6 +628,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 Text(Strings.searchPlacesLoading),
               ]),
             ),
+          if (!_searching && queryLength > 0 && queryLength < 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(Strings.searchPlacesShort,
+                  style: TextStyle(color: context.palette.muted)),
+            ),
           if (_suggestions.isNotEmpty)
             Card(
               margin: const EdgeInsets.only(top: 6),
@@ -564,11 +685,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 : IconButton(
                     icon: const Icon(Icons.close),
                     tooltip: 'Хаяг арилгах',
-                    onPressed: () {
-                      _searchController.clear();
-                      _onSearchChanged('');
-                      _searchFocusNode.requestFocus();
-                    },
+                    onPressed: _busy
+                        ? null
+                        : () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                            _searchFocusNode.requestFocus();
+                          },
                   ),
           ),
         ),

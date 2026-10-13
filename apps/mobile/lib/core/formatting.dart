@@ -34,3 +34,15 @@ String newIdempotencyKey() {
   const chars = 'abcdef0123456789';
   return List.generate(32, (_) => chars[_random.nextInt(chars.length)]).join();
 }
+
+/// A random UUID (version 4), 36 characters. Used as the Google Places
+/// billing-session token that `GET /places` and `GET /places/{id}` accept as
+/// `session` (8–36 letters, digits, `-` or `_`; see services/api/app/main.py).
+String newPlaceSessionToken() {
+  final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+  String hex(int start, int end) =>
+      bytes.sublist(start, end).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
+}

@@ -235,16 +235,31 @@ async def services(db: DB):
     return [service_json(row) for row in (await db.scalars(select(Service).where(Service.is_active.is_(True)).order_by(Service.sort_order))).all()]
 
 
+# One token per typing session, made by the client (a UUID is fine). Google bills the searches and the
+# final place lookup that share a token as one session.
+PLACE_SESSION_PATTERN = r"^[A-Za-z0-9_-]{8,36}$"
+PlaceSession = Annotated[str | None, Query(max_length=36, pattern=PLACE_SESSION_PATTERN)]
+
+
 @app.get("/places")
-async def places(user: Customer, q: str = Query(default="", max_length=150)):
+async def places(user: Customer, q: str = Query(default="", max_length=150), session: PlaceSession = None):
     await cache.limit("places:" + user.id, 120, 60)
-    return await maps_provider().search(q)
+    return await maps_provider().search(q, session)
 
 
 @app.get("/places/{place_id}")
-async def place(place_id: str, user: Customer):
+async def place(place_id: str, user: Customer, session: PlaceSession = None):
     await cache.limit("place:" + user.id, 60, 60)
-    return await maps_provider().place(place_id)
+    return await maps_provider().place(place_id, session)
+
+
+@app.get("/geocode")
+async def reverse_geocode(user: Customer, lat: float = Query(ge=47.0, le=49.0),
+                          lng: float = Query(ge=105.0, le=108.0)):
+    """The address of a point the customer tapped on the map or got from GPS. 404 PLACE_NOT_FOUND
+    when there is none (always, under the demo maps): the client then labels the point itself."""
+    await cache.limit("geocode:" + user.id, 60, 60)
+    return {"address": await maps_provider().reverse(lat, lng)}
 
 
 @app.post("/quotes")

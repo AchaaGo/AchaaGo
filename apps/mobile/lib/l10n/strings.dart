@@ -65,14 +65,19 @@ class Strings {
   static const searchPickup = 'Авах хаягаа хайх';
   static const searchDestination = 'Хүргэх хаягаа хайх';
   static const mapSelectedPoint = 'Газрын зураг дээр сонгосон цэг';
-  static const searchPlacesLoading = 'Хайж байна…';
-  static const searchPlacesEmpty = 'Илэрц олдсонгүй. Өөр нэрээр хайна уу.';
+  // Same wording as the web's customerCopy.ts.
+  static const searchPlacesLoading = 'Хаяг хайж байна…';
+  static const searchPlacesEmpty =
+      'Хаяг олдсонгүй. Өөр нэрээр хайх эсвэл газрын зураг дээр сонгоно уу.';
   static const searchPlacesShort =
-      'Хаягийн нэрээс 3-аас дээш тэмдэгт бичнэ үү.';
+      'Хайхын тулд 3-аас доошгүй тэмдэгт оруулна уу.';
   static const useCurrentLocation = 'Одоогийн байршил ашиглах';
   static const locationFailed =
-      'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл жагсаалтаас сонгоно уу.';
+      'Байршил авах боломжгүй байна. Хаягаа хайх эсвэл газрын зураг дээр сонгоно уу.';
   static const needsPickup = 'Авах хаягаа сонгоно уу.';
+  static const needsQuote = 'Үнэ тооцоологдоогүй байна. Дахин тооцоолно уу.';
+  static const retryQuote = 'Үнэ дахин тооцоолох';
+  static const roadUnavailable = 'Авто замын маршрут олдсонгүй.';
   static const changeAddress = 'Өөрчлөх';
   static const changePickup = 'Авах хаягийг өөрчлөх';
   static const changeDestination = 'Хүргэх хаягийг өөрчлөх';

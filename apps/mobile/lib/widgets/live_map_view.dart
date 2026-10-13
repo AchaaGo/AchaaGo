@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../core/route_polyline.dart';
+import '../l10n/strings.dart';
 import '../models/point.dart';
 import '../theme/app_theme.dart';
 import '../theme/map_style.dart';
@@ -12,18 +13,89 @@ const _ulaanbaatarCenter = LatLng(47.9186, 106.9177);
 /// white casing keeps it readable on the dark map too.
 const _routeColor = Color(0xFF14213D);
 
+/// Bounds smaller than this (about 40 m) are one place seen twice: centre on
+/// it instead of zooming to the map's maximum.
+const _minBoundsSpan = 0.0004;
+
 LatLng _toLatLng(GeoPoint point) => LatLng(point.lat, point.lng);
 
-/// The real map behind the customer and driver route/tracking screens,
-/// replacing the decorative RouteIllustration now that a Google Maps API
-/// key exists (see apps/mobile/README.md). Mirrors the web app's
-/// GoogleMapView.tsx: pickup/dropoff markers, the server's own road-following
-/// route when [routePolyline] decodes (same encoded polyline the backend
-/// already returns from `/quotes` and orders — see
-/// apps/mobile/lib/core/route_polyline.dart), falling back to a straight
-/// line otherwise, and a pulsing circle while a driver is being found. If no
-/// key is configured, the native Android Maps SDK itself falls back to
-/// blank tiles rather than crashing, so no extra fallback UI is needed here.
+bool _samePoint(GeoPoint? a, GeoPoint? b) =>
+    a == null || b == null ? a == b : a.lat == b.lat && a.lng == b.lng;
+
+/// The road route to draw, or null. Only the server's decoded road geometry
+/// is ever drawn — never a straight line between the endpoints.
+List<LatLng>? drawableRoute({
+  required bool showRoute,
+  GeoPoint? pickup,
+  GeoPoint? dropoff,
+  List<LatLng>? routePoints,
+}) =>
+    showRoute && pickup != null && dropoff != null ? routePoints : null;
+
+/// A route was asked for between two endpoints but there is no road
+/// geometry for it: show the notice instead of a line.
+bool needsRouteNotice({
+  required bool showRoute,
+  GeoPoint? pickup,
+  GeoPoint? dropoff,
+  List<LatLng>? routePoints,
+}) =>
+    showRoute &&
+    pickup != null &&
+    dropoff != null &&
+    drawableRoute(
+            showRoute: showRoute,
+            pickup: pickup,
+            dropoff: dropoff,
+            routePoints: routePoints) ==
+        null;
+
+/// What the camera should do for the current endpoints, or null for nothing.
+/// Both endpoints: fit them and the road route ([routePoints], once there is
+/// one). One endpoint: pan to it, so a late GPS fix recentres the map. Two
+/// endpoints that are the same place: centre on them rather than zooming to
+/// the map's maximum.
+CameraUpdate? planCameraUpdate({
+  GeoPoint? pickup,
+  GeoPoint? dropoff,
+  List<LatLng>? routePoints,
+}) {
+  if (pickup == null && dropoff == null) return null;
+  if (pickup == null || dropoff == null) {
+    return CameraUpdate.newLatLng(_toLatLng((pickup ?? dropoff)!));
+  }
+  final points = [_toLatLng(pickup), _toLatLng(dropoff), ...?routePoints];
+  var south = points.first.latitude, north = points.first.latitude;
+  var west = points.first.longitude, east = points.first.longitude;
+  for (final point in points.skip(1)) {
+    if (point.latitude < south) south = point.latitude;
+    if (point.latitude > north) north = point.latitude;
+    if (point.longitude < west) west = point.longitude;
+    if (point.longitude > east) east = point.longitude;
+  }
+  if (north - south < _minBoundsSpan && east - west < _minBoundsSpan) {
+    return CameraUpdate.newLatLngZoom(
+        LatLng((south + north) / 2, (west + east) / 2), 16);
+  }
+  return CameraUpdate.newLatLngBounds(
+      LatLngBounds(southwest: LatLng(south, west), northeast: LatLng(north, east)),
+      56);
+}
+
+/// The real map behind the customer and driver route/tracking screens.
+/// Mirrors the web app's GoogleMapView.tsx: pickup/dropoff markers, the
+/// server's own road-following route when [routePolyline] decodes (the same
+/// encoded polyline the backend returns from `/quotes` and orders — see
+/// apps/mobile/lib/core/route_polyline.dart), and a pulsing circle while a
+/// driver is being found.
+///
+/// Like the web map it never substitutes an endpoint-to-endpoint line for a
+/// missing road route (that is what made routes look "linear"): when a
+/// route is requested but the server sent none — for instance under
+/// `MAPS_PROVIDER=demo` — it shows a notice, with a retry button when the
+/// screen can ask for the route again ([onRetryRoute]). If no Maps key is
+/// configured, the native SDK falls back to blank tiles rather than
+/// crashing, so no extra fallback UI is needed here.
 class LiveMapView extends StatefulWidget {
   const LiveMapView({
     super.key,
@@ -36,6 +108,7 @@ class LiveMapView extends StatefulWidget {
     this.showTruck = false,
     this.myLocationEnabled = false,
     this.onPick,
+    this.onRetryRoute,
   });
 
   final GeoPoint? pickup;
@@ -56,6 +129,10 @@ class LiveMapView extends StatefulWidget {
 
   /// Allows the customer to choose a drop-off directly on the map.
   final ValueChanged<LatLng>? onPick;
+
+  /// Offered next to the "no road route" notice, for screens that can ask the
+  /// server for the route again (the quote screen requotes).
+  final VoidCallback? onRetryRoute;
 
   @override
   State<LiveMapView> createState() => _LiveMapViewState();
@@ -84,8 +161,13 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
     if (widget.routePolyline != oldWidget.routePolyline) {
       _routePoints = decodeRoutePolyline(widget.routePolyline);
     }
-    if (widget.pickup != oldWidget.pickup || widget.dropoff != oldWidget.dropoff || widget.routePolyline != oldWidget.routePolyline) {
-      _fitBounds();
+    // Compared by coordinates: a tracking screen rebuilds its order (and so
+    // its points) on every status update, and that must not move the camera.
+    if (!_samePoint(widget.pickup, oldWidget.pickup) ||
+        !_samePoint(widget.dropoff, oldWidget.dropoff) ||
+        widget.routePolyline != oldWidget.routePolyline ||
+        widget.showRoute != oldWidget.showRoute) {
+      _moveCamera();
     }
   }
 
@@ -102,22 +184,25 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
     super.dispose();
   }
 
-  Future<void> _fitBounds() async {
+  Future<void> _moveCamera() async {
     final controller = _controller;
-    final pickup = widget.pickup;
-    final dropoff = widget.dropoff;
-    if (controller == null || pickup == null || dropoff == null) return;
-    final points = [_toLatLng(pickup), _toLatLng(dropoff), if (widget.showRoute) ...?_routePoints];
-    var south = points.first.latitude, north = points.first.latitude;
-    var west = points.first.longitude, east = points.first.longitude;
-    for (final point in points.skip(1)) {
-      if (point.latitude < south) south = point.latitude;
-      if (point.latitude > north) north = point.latitude;
-      if (point.longitude < west) west = point.longitude;
-      if (point.longitude > east) east = point.longitude;
+    if (controller == null) return;
+    final update = planCameraUpdate(
+      pickup: widget.pickup,
+      dropoff: widget.dropoff,
+      routePoints: drawableRoute(
+          showRoute: widget.showRoute,
+          pickup: widget.pickup,
+          dropoff: widget.dropoff,
+          routePoints: _routePoints),
+    );
+    if (update == null) return;
+    try {
+      await controller.animateCamera(update);
+    } catch (_) {
+      // The map refuses camera moves until it has a size; the next update
+      // (or the map's own creation callback) tries again.
     }
-    final bounds = LatLngBounds(southwest: LatLng(south, west), northeast: LatLng(north, east));
-    await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 56));
   }
 
   @override
@@ -147,18 +232,22 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           zIndexInt: 2,
         ),
     };
-    final routePoints = _routePoints;
+    final routePoints = drawableRoute(
+        showRoute: widget.showRoute,
+        pickup: pickup,
+        dropoff: dropoff,
+        routePoints: _routePoints);
     final polylines = <Polyline>{
-      if (widget.showRoute && pickup != null && dropoff != null) ...[
+      if (routePoints != null) ...[
         Polyline(
           polylineId: const PolylineId('route-outline'),
-          points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
+          points: routePoints,
           color: Colors.white,
           width: 9,
         ),
         Polyline(
           polylineId: const PolylineId('route'),
-          points: routePoints ?? [_toLatLng(pickup), _toLatLng(dropoff)],
+          points: routePoints,
           color: _routeColor,
           width: 5,
         ),
@@ -175,21 +264,74 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           strokeWidth: 0,
         ),
     };
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: pickup != null ? _toLatLng(pickup) : _ulaanbaatarCenter, zoom: 14),
-      style: Theme.of(context).brightness == Brightness.dark ? darkMapStyle : lightMapStyle,
-      onMapCreated: (controller) {
-        _controller = controller;
-        _fitBounds();
-      },
-      markers: markers,
-      polylines: polylines,
-      circles: circles,
-      myLocationEnabled: widget.myLocationEnabled,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      onTap: widget.onPick,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GoogleMap(
+            initialCameraPosition:
+                CameraPosition(target: pickup != null ? _toLatLng(pickup) : _ulaanbaatarCenter, zoom: 14),
+            style: Theme.of(context).brightness == Brightness.dark ? darkMapStyle : lightMapStyle,
+            onMapCreated: (controller) {
+              _controller = controller;
+              _moveCamera();
+            },
+            markers: markers,
+            polylines: polylines,
+            circles: circles,
+            myLocationEnabled: widget.myLocationEnabled,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onTap: widget.onPick,
+          ),
+        ),
+        if (needsRouteNotice(
+            showRoute: widget.showRoute,
+            pickup: pickup,
+            dropoff: dropoff,
+            routePoints: _routePoints))
+          Positioned(
+            left: 12,
+            right: 12,
+            top: 12,
+            child: RouteNotice(onRetry: widget.onRetryRoute),
+          ),
+      ],
+    );
+  }
+}
+
+/// "No road route" status over the map: the web's `map-route-status`.
+class RouteNotice extends StatelessWidget {
+  const RouteNotice({super.key, this.onRetry});
+
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: onRetry == null ? 10 : 2),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: p.line),
+          boxShadow: const [BoxShadow(color: sheetShadowColor, blurRadius: 20, offset: Offset(0, 6))],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                Strings.roadUnavailable,
+                style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (onRetry != null) TextButton(onPressed: onRetry, child: const Text(Strings.retry)),
+          ],
+        ),
+      ),
     );
   }
 }

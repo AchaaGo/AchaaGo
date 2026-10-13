@@ -62,7 +62,8 @@ class Quote {
 
   /// Google encoded polyline for the driving route, from the same
   /// maps-provider call the server used for `distanceKm`/pricing. Null
-  /// under the demo maps provider; screens fall back to a straight line.
+  /// under the demo maps provider; the map then shows a "no road route" notice,
+  /// never a straight line.
   final String? polyline;
 
   ServicePrice? priceFor(String serviceId) {

@@ -172,9 +172,13 @@ Break one of these only on purpose, and change both clients together.
 
 - **Route line:** the web map (`GoogleMapView`) draws the road geometry the server sends as an encoded `polyline` on quotes and orders (`lib/roadRoute.ts`). It never draws a straight pickup-to-drop-off line. Without a polyline (demo maps provider), it asks the browser Routes library, and shows a retry notice if that fails.
 - **Quote screen:** the line is drawn only once a quote has arrived, so a tap on the map does not trigger a routing request of its own.
-- **Mobile:** `lib/core/route_polyline.dart` does the same decoding.
+- **Mobile map:** `lib/core/route_polyline.dart` decodes the same polyline and `LiveMapView` follows the same rule: it never draws a straight line. When a route is asked for and the server sent no polyline (demo maps provider), the map shows "Авто замын маршрут олдсонгүй.", with a retry button on the quote screen (it requotes). The quote screen draws the route only once a quote has arrived. With one endpoint the camera pans to it, so a late GPS fix recentres the map.
+- **Mobile place search goes through the server.** Unlike the web, the app has no browser key and calls no Google API itself: `GET /places`, `GET /places/{id}` and `GET /geocode` do the work (`providers.GoogleMaps`). Under `MAPS_PROVIDER=demo` search is limited to the six demo landmarks, a map tap or "current location" is labelled "Газрын зураг дээр сонгосон цэг" / "Одоогийн байршил" instead of an address, and routes have no road line. The server key needs Places API (New), Routes API and Geocoding API.
+- **Places billing session:** the app (and any client) can send `session=<UUID>` to `GET /places` and `GET /places/{id}`. The server passes it to Google as `sessionToken`, so one typing session is billed once instead of per keystroke, as the web's session token does. The app keeps one token per typing session (`core/place_session.dart`) and ends it when a place is chosen, the field is cleared or switched, or the map is tapped. The server also asks Google for Mongolian (`languageCode: mn`), like the web.
+- **`GET /geocode?lat&lng`** returns `{"address"}` for a map tap or a GPS fix (Geocoding API; the point must be inside the service area, as for `Location`). It answers 404 `PLACE_NOT_FOUND` when there is no address, always so under the demo maps. Clients then label the point themselves. The mobile app calls it only after an explicit tap or "use current location", not for the automatic GPS pickup.
 - **Pickup address:** the pickup starts as the device location (or a default point in the city centre) and the customer can change it (search, map tap or "use current location") as well as the drop-off. While a new pickup is being chosen, the route and price wait for it.
 - **Late GPS fix:** `pickupTouched` in `CustomerFlow.tsx` is set as soon as the customer taps a service. A GPS fix that arrives after that is ignored, so the pickup stays at the default city-centre point (labelled "Одоогийн байршил") until the customer changes it. This avoids a stale quote but can leave a wrong pickup unnoticed. See Technical debt.
+- **Late GPS fix on mobile:** `RoutePlannerScreen` ignores a late fix only once the customer has worked on the pickup (`_pickupTouched`). Otherwise it updates the pickup and, if a destination is already chosen, requotes (`_quoteRevision` drops an older, slower quote). The home screen passes the fix it already has as `initialPickup`, so the planner usually opens at the right place.
 
 ### Services
 
@@ -225,6 +229,7 @@ Break one of these only on purpose, and change both clients together.
 
 | Commit | Change |
 |---|---|
+| mobile maps | The mobile route screen follows the web's address, map and quote flow: no straight route line (a notice and a retry instead), place search with a Google billing session and Mongolian results, street addresses for map taps and "current location" through the new `GET /geocode`, a late GPS fix that never overwrites a chosen pickup, a quote that is cleared and retried when it fails, and the active order opened on `ACTIVE_ORDER_EXISTS`. Server: `session` on `/places`, `languageCode: mn`, `GET /geocode`, `GoogleMaps` testable through a transport (`tests/test_maps.py`). |
 | mobile theme | The Flutter app gets the web's brand palette, a light and dark theme with a saved toggle, and the dark map style. Colours are read with `context.palette` instead of fixed constants. |
 | merge of `uiux/achaa-go-polish` | The dark design and its features (brand palette, light/dark themes, pickup selection, vehicle cards, draggable sheet, menu and profile panels, the inactive motorcycle service) merged into `main` together with the session, quote and request fixes below. Their six browser tests now run in CI. |
 | `05b158e` | Road-following routes on the web map instead of a straight line. |
@@ -251,7 +256,7 @@ Commits signed "AchaaGo Deploy", "Enerelt" or "sarantuyaenerelt95" are not Claud
 2. **SMS gateway account** in Mongolia. Configure it through `SMS_HTTP_*`; no code change needed.
 3. **QPay merchant credentials:** `QPAY_PROVIDER=qpay`, username, password and invoice code.
 4. **Firebase project** for driver push. On the server: `FCM_PROVIDER` set to anything but `console`, `FCM_PROJECT_ID`, and `GOOGLE_APPLICATION_CREDENTIALS`. The app side is still to build (see below).
-5. **Server Google Maps key** (`MAPS_PROVIDER=google`, `GOOGLE_MAPS_API_KEY`) for real distances. Until then, quotes use the demo router and are marked `approximate`.
+5. **Server Google Maps key** (`MAPS_PROVIDER=google`, `GOOGLE_MAPS_API_KEY`, restricted to the server's IP, with Places API (New), Routes API and Geocoding API enabled) for real distances. Until then, quotes use the demo router and are marked `approximate`. **The mobile app needs this to look like the web:** it has no browser key, so under the demo provider its address search finds only six landmarks and its map has no road line.
 6. **Apple Developer and Google Play accounts** to publish the app.
 7. **Product decisions:** the Амжиргаа service definition, real prices, fares for the motorcycle service, cancellation rules and fees, driver commission, brand name (AGENTS.md §14).
 

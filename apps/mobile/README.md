@@ -95,18 +95,45 @@ it before going online.
 
 ### Real address suggestions and road routes
 
-The customer route screen searches as the customer types, lets them choose
-pickup or destination, and requests a fresh route and price after a place is
-selected. The mobile app calls AchaaGo's `/places`, `/places/{id}`, and
-`/quotes` endpoints; it does not embed a web-browser Google API key.
+The customer route screen follows the web app's flow (`apps/web`
+`CustomerFlow.tsx`). It searches as the customer types, lets them choose
+pickup or destination, accepts a tap on the map for whichever address is
+being edited, and requests a fresh route and price once both addresses are
+settled. The mobile app calls AchaaGo's `/places`, `/places/{id}`,
+`/geocode` and `/quotes` endpoints; it does not embed a web-browser Google
+API key and never calls Google itself.
 
-For real Google place names and a road-following route, the **API server**
-must use `MAPS_PROVIDER=google` and a server-side `GOOGLE_MAPS_API_KEY` with
-Places API (New) and Routes API enabled. Keep that key only in the server's
-untracked environment, not in Flutter or Git. With `MAPS_PROVIDER=demo`,
-search is limited to the six demo landmarks and the map shows an approximate
-straight line instead of a road polyline. The mobile search remains usable,
-but that demo behavior is not a live Google integration.
+What it does with them:
+
+- **Search:** at least 3 characters, 300 ms after the last keystroke; a
+  slower, older answer never replaces a newer one (`SearchRevision`).
+- **Billing session:** every search of one typing session and the final place
+  lookup carry the same `session` token (`core/place_session.dart`), which the
+  server passes to Google so the session is billed once, not per keystroke. It
+  ends when a place is chosen, the field is cleared or switched, or the map is
+  tapped.
+- **Map tap and "current location":** resolved to a street address through
+  `GET /geocode` (only after an explicit action, never for the automatic GPS
+  pickup, to keep Geocoding calls down). With no address available the point is
+  labelled "Газрын зураг дээр сонгосон цэг" or "Одоогийн байршил".
+- **Pickup:** starts at the device position (the home screen hands over the
+  fix it already has), else the city centre. A late fix updates it, and
+  requotes if a destination is already chosen, unless the customer has
+  already worked on the pickup.
+- **Route line:** only the server's road geometry (`polyline`) is drawn, and
+  only once a quote has arrived. There is never a straight line between the
+  two points: without a polyline the map says "Авто замын маршрут олдсонгүй."
+  and offers a retry that requotes.
+
+For real Google place names, street addresses and a road-following route,
+the **API server** must use `MAPS_PROVIDER=google` and a server-side
+`GOOGLE_MAPS_API_KEY` with Places API (New), Routes API and Geocoding API
+enabled. Keep that key only in the server's untracked environment, not in
+Flutter or Git. With `MAPS_PROVIDER=demo`, search is limited to the six demo
+landmarks, map taps get no street address and quotes carry no road line, so
+the map shows the "no road route" notice. The web app looks better under the
+demo provider only because it asks Google from the browser with its own key;
+the mobile app deliberately does not.
 
 Every network call goes through `lib/config/app_config.dart` — the single
 place that knows the backend's address:
@@ -193,9 +220,9 @@ test/            Unit tests (formatting, error mapping, API client, model
 
 `lib/widgets/live_map_view.dart` uses `google_maps_flutter`, shown on the
 route, tracking, finding-driver, public-tracking, and driver active-order
-screens (pickup/drop-off markers, a straight line between them — no
-Directions API, same scope as the web app's map — and the driver's own
-live position via the OS location layer).
+screens (pickup/drop-off markers, the server's road route when it sends
+one — never a straight line, see "Real address suggestions and road
+routes" — and the driver's own live position via the OS location layer).
 
 **This needs its own API key — you cannot reuse the website's key.** A
 Google Cloud key is restricted either to "Websites" (checks the page's

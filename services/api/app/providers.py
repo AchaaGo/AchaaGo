@@ -85,13 +85,22 @@ LANDMARKS = [
 ]
 
 
+# httpx logs every request URL at INFO, and the Geocoding API takes its key in the URL.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Customers read addresses in Mongolian, as the web's own Places search (language "mn") shows them.
+PLACES_LANGUAGE = "mn"
+
+
 class MapsProvider(ABC):
     @abstractmethod
     async def route(self, pickup, dropoff) -> Route: ...
     @abstractmethod
-    async def search(self, text: str) -> list: ...
+    async def search(self, text: str, session: str | None = None) -> list: ...
     @abstractmethod
-    async def place(self, place_id: str) -> dict: ...
+    async def place(self, place_id: str, session: str | None = None) -> dict: ...
+    @abstractmethod
+    async def reverse(self, lat: float, lng: float) -> str: ...
 
 
 class DemoMaps(MapsProvider):
@@ -101,20 +110,30 @@ class DemoMaps(MapsProvider):
             raise HTTPException(422, "ROUTE_TOO_SHORT")
         return Route(km, max(3, math.ceil(km * 3.5)))
 
-    async def search(self, text):
+    async def search(self, text, session=None):
         return [{"id": row["id"], "address": row["address"]} for row in LANDMARKS
                 if text.casefold() in row["address"].casefold()][:6]
 
-    async def place(self, place_id):
+    async def place(self, place_id, session=None):
         for row in LANDMARKS:
             if row["id"] == place_id:
                 return {key: row[key] for key in ("lat", "lng", "address")}
         raise HTTPException(404, "PLACE_NOT_FOUND")
 
+    async def reverse(self, lat, lng):
+        # No address database offline: clients label the point themselves, as they do when Google has none.
+        raise HTTPException(404, "PLACE_NOT_FOUND")
+
 
 class GoogleMaps(MapsProvider):
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None):
+        self.transport = transport  # tests inject httpx.MockTransport
+
+    def client(self, timeout):
+        return httpx.AsyncClient(timeout=timeout, transport=self.transport)
+
     async def route(self, pickup, dropoff):
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with self.client(15) as client:
             result = await client.post("https://routes.googleapis.com/directions/v2:computeRoutes", headers={
                 "X-Goog-Api-Key": settings.google_maps_api_key,
                 "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"}, json={
@@ -131,26 +150,49 @@ class GoogleMaps(MapsProvider):
         return Route(round(route["distanceMeters"] / 1000, 3), max(1, math.ceil(float(route["duration"][:-1]) / 60)),
                      route.get("polyline", {}).get("encodedPolyline"))
 
-    async def search(self, text):
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.post("https://places.googleapis.com/v1/places:autocomplete", headers={
-                "X-Goog-Api-Key": settings.google_maps_api_key}, json={"input": text,
+    async def search(self, text, session=None):
+        # The session token makes Google bill one typing session (every keystroke's suggestions, then the
+        # chosen place's details) as a single request instead of one per keystroke.
+        body = {"input": text, "languageCode": PLACES_LANGUAGE,
                 "includedRegionCodes": ["mn"], "locationBias": {"circle": {"center": {
-                    "latitude": 47.9186, "longitude": 106.9177}, "radius": 50000}}})
+                    "latitude": 47.9186, "longitude": 106.9177}, "radius": 50000}}}
+        if session:
+            body["sessionToken"] = session
+        async with self.client(10) as client:
+            response = await client.post("https://places.googleapis.com/v1/places:autocomplete", headers={
+                "X-Goog-Api-Key": settings.google_maps_api_key}, json=body)
             response.raise_for_status()
         return [{"id": row["placePrediction"]["placeId"], "address": row["placePrediction"]["text"]["text"]}
                 for row in response.json().get("suggestions", []) if "placePrediction" in row]
 
-    async def place(self, place_id):
+    async def place(self, place_id, session=None):
         if not place_id.replace("_", "").replace("-", "").isalnum() or len(place_id) > 300:
             raise HTTPException(422, "PLACE_NOT_FOUND")
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"https://places.googleapis.com/v1/places/{place_id}", headers={
-                "X-Goog-Api-Key": settings.google_maps_api_key,
-                "X-Goog-FieldMask": "formattedAddress,location"})
+        params = {"languageCode": PLACES_LANGUAGE}
+        if session:
+            params["sessionToken"] = session  # ends the billing session the searches started
+        async with self.client(10) as client:
+            response = await client.get(
+                f"https://places.googleapis.com/v1/places/{place_id}", params=params,
+                headers={"X-Goog-Api-Key": settings.google_maps_api_key,
+                         "X-Goog-FieldMask": "formattedAddress,location"})
             response.raise_for_status()
         row = response.json()
         return {"lat": row["location"]["latitude"], "lng": row["location"]["longitude"], "address": row["formattedAddress"]}
+
+    async def reverse(self, lat, lng):
+        async with self.client(10) as client:
+            response = await client.get("https://maps.googleapis.com/maps/api/geocode/json", params={
+                "latlng": f"{lat},{lng}", "language": PLACES_LANGUAGE, "key": settings.google_maps_api_key})
+            response.raise_for_status()
+        data = response.json()
+        results = data.get("results") or []
+        if data.get("status") == "OK" and results and results[0].get("formatted_address"):
+            return results[0]["formatted_address"]
+        if data.get("status") not in ("OK", "ZERO_RESULTS"):
+            # REQUEST_DENIED and similar mean the key or the Geocoding API is not set up: tell the operator.
+            log.warning("Geocoding API answered %s", data.get("status"))
+        raise HTTPException(404, "PLACE_NOT_FOUND")
 
 
 def maps_provider():

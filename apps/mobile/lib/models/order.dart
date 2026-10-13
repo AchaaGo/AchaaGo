@@ -99,7 +99,7 @@ class Order {
 
   /// Google encoded polyline for the route actually driven, computed once
   /// at order creation (see Quote.polyline). Null under the demo maps
-  /// provider; screens fall back to a straight line.
+  /// provider; the map then shows a "no road route" notice, never a straight line.
   final String? polyline;
 
   bool get isActive => activeOrderStatuses.contains(status);

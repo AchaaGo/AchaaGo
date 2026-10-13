@@ -39,6 +39,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   GeoPoint _pickup = const GeoPoint(
       lat: 47.9186, lng: 106.9177, address: Strings.currentLocation);
 
+  /// True once [_pickup] is a real device position rather than the
+  /// Ulaanbaatar-centre placeholder; only then is it handed to the planner.
+  bool _hasDeviceFix = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,10 +66,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)),
       );
       if (mounted) {
-        setState(() => _pickup = GeoPoint(
-            lat: position.latitude,
-            lng: position.longitude,
-            address: Strings.currentLocation));
+        setState(() {
+          _pickup = GeoPoint(
+              lat: position.latitude,
+              lng: position.longitude,
+              address: Strings.currentLocation);
+          _hasDeviceFix = true;
+        });
       }
     } catch (_) {
       // A denied or unavailable location keeps the map centered on Ulaanbaatar.
@@ -131,7 +138,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     Navigator.of(context)
         .push(MaterialPageRoute(
           builder: (_) => RoutePlannerScreen(
-              initialServiceId: resolved, services: _services),
+              initialServiceId: resolved,
+              services: _services,
+              initialPickup: _hasDeviceFix ? _pickup : null),
         ))
         .then((_) => _load());
   }
