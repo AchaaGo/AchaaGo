@@ -26,9 +26,13 @@ both customers who prefer an app and, per `AGENTS.md`, drivers.
   delivered → completed status buttons, including cash/QPay confirmation
 
 **Appearance**
-- The web design: orange and forest-green brand colours with a light and a
-  dark theme (`lib/theme/app_theme.dart`, the same tokens as
-  `apps/web/src/app/globals.css`)
+- The deployed customer web design: navy `#0E2350`, primary blue `#0765F7`,
+  and orange destination accents `#FE6E01`, with light and dark themes.
+  Colours are shared centrally in `lib/theme/app_theme.dart`.
+- Bundled Golos Text and Unbounded fonts support Cyrillic and work offline.
+- The booking screen matches the web's address tabs, selected-address card,
+  vehicle prices, loader checkbox, payment selection, blue road route and
+  blue/orange markers. The map accepts pan/zoom inside the scrolling page.
 - The theme follows the device setting until the customer picks one with the
   sun/moon button (login, code entry, route screen, driver app bar, and the
   customer menu); the choice is remembered on the device, also after logout
@@ -124,6 +128,15 @@ What it does with them:
   only once a quote has arrived. There is never a straight line between the
   two points: without a polyline the map says "Авто замын маршрут олдсонгүй."
   and offers a retry that requotes.
+- **Price safety:** editing an address immediately invalidates any pending
+  quote, including a loader-price update. Late responses cannot restore an
+  old route or enable ordering. Orders submit the backend's signed quote
+  token and exact displayed total; an expired quote is refreshed for review.
+
+Verify these interactions with `flutter test test/screens/route_planner_screen_test.dart`.
+The tests exercise typing/debounce, stale results, place selection, map-tap
+address lookup, signed quotes, expired quotes and narrow screens with the
+keyboard open. Only the native map view and HTTP transport are stubbed.
 
 For real Google place names, street addresses and a road-following route,
 the **API server** must use `MAPS_PROVIDER=google` and a server-side

@@ -1,3 +1,7 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -9,9 +13,9 @@ import '../theme/map_style.dart';
 
 const _ulaanbaatarCenter = LatLng(47.9186, 106.9177);
 
-/// The route line is the same navy in both themes, as on the web map: the
+/// The route line is the same blue in both themes, as on the web map: the
 /// white casing keeps it readable on the dark map too.
-const _routeColor = Color(0xFF14213D);
+const _routeColor = brandBlue;
 
 /// Bounds smaller than this (about 40 m) are one place seen twice: centre on
 /// it instead of zooming to the map's maximum.
@@ -78,7 +82,8 @@ CameraUpdate? planCameraUpdate({
         LatLng((south + north) / 2, (west + east) / 2), 16);
   }
   return CameraUpdate.newLatLngBounds(
-      LatLngBounds(southwest: LatLng(south, west), northeast: LatLng(north, east)),
+      LatLngBounds(
+          southwest: LatLng(south, west), northeast: LatLng(north, east)),
       56);
 }
 
@@ -138,16 +143,52 @@ class LiveMapView extends StatefulWidget {
   State<LiveMapView> createState() => _LiveMapViewState();
 }
 
-class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStateMixin {
+class _LiveMapViewState extends State<LiveMapView>
+    with SingleTickerProviderStateMixin {
   GoogleMapController? _controller;
   AnimationController? _pulseController;
   List<LatLng>? _routePoints;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropoffIcon;
 
   @override
   void initState() {
     super.initState();
     if (widget.pulse) _startPulse();
     _routePoints = decodeRoutePolyline(widget.routePolyline);
+    _loadMarkerIcons();
+  }
+
+  // Match the web's blue pickup dot and orange destination square instead
+  // of the SDK's oversized teardrop pins. Draw locally; no asset/network load.
+  Future<void> _loadMarkerIcons() async {
+    final icons = await Future.wait([_markerIcon(false), _markerIcon(true)]);
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = icons[0];
+      _dropoffIcon = icons[1];
+    });
+  }
+
+  Future<BitmapDescriptor> _markerIcon(bool destination) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()..color = destination ? brandBlue : Colors.white;
+    if (destination) {
+      canvas.drawRect(const Rect.fromLTWH(9, 9, 54, 54), paint);
+      canvas.drawRect(const Rect.fromLTWH(18, 18, 36, 36),
+          paint..color = destinationOrange);
+    } else {
+      canvas.drawCircle(const Offset(36, 36), 30, paint);
+      canvas.drawCircle(const Offset(36, 36), 21, paint..color = brandBlue);
+    }
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(72, 72);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    picture.dispose();
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List(),
+        imagePixelRatio: 3, width: 24, height: 24);
   }
 
   @override
@@ -172,7 +213,8 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
   }
 
   void _startPulse() {
-    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+    _pulseController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1400))
       ..addListener(() => setState(() {}))
       ..repeat(reverse: true);
   }
@@ -214,21 +256,26 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
         Marker(
           markerId: const MarkerId('pickup'),
           position: _toLatLng(pickup),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: _pickupIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          anchor: const Offset(0.5, 0.5),
           zIndexInt: 1,
         ),
       if (dropoff != null)
         Marker(
           markerId: const MarkerId('dropoff'),
           position: _toLatLng(dropoff),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          icon: _dropoffIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          anchor: const Offset(0.5, 0.5),
           zIndexInt: 1,
         ),
       if (widget.showTruck && widget.driverLocation != null)
         Marker(
           markerId: const MarkerId('driver'),
           position: _toLatLng(widget.driverLocation!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon:
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
           zIndexInt: 2,
         ),
     };
@@ -260,7 +307,8 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
           circleId: const CircleId('pulse'),
           center: _toLatLng(pickup),
           radius: 40 + pulseFraction * 60,
-          fillColor: context.palette.accent.withValues(alpha: 0.35 * (1 - pulseFraction)),
+          fillColor: context.palette.accent
+              .withValues(alpha: 0.35 * (1 - pulseFraction)),
           strokeWidth: 0,
         ),
     };
@@ -268,9 +316,17 @@ class _LiveMapViewState extends State<LiveMapView> with SingleTickerProviderStat
       children: [
         Positioned.fill(
           child: GoogleMap(
-            initialCameraPosition:
-                CameraPosition(target: pickup != null ? _toLatLng(pickup) : _ulaanbaatarCenter, zoom: 14),
-            style: Theme.of(context).brightness == Brightness.dark ? darkMapStyle : lightMapStyle,
+            // Keep native pan/zoom responsive inside the booking scroll view.
+            gestureRecognizers: {
+              Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer()),
+            },
+            initialCameraPosition: CameraPosition(
+                target: pickup != null ? _toLatLng(pickup) : _ulaanbaatarCenter,
+                zoom: 14),
+            style: Theme.of(context).brightness == Brightness.dark
+                ? darkMapStyle
+                : lightMapStyle,
             onMapCreated: (controller) {
               _controller = controller;
               _moveCamera();
@@ -313,22 +369,28 @@ class RouteNotice extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: onRetry == null ? 10 : 2),
+        padding: EdgeInsets.symmetric(
+            horizontal: 12, vertical: onRetry == null ? 10 : 2),
         decoration: BoxDecoration(
           color: p.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: p.line),
-          boxShadow: const [BoxShadow(color: sheetShadowColor, blurRadius: 20, offset: Offset(0, 6))],
+          boxShadow: const [
+            BoxShadow(
+                color: sheetShadowColor, blurRadius: 20, offset: Offset(0, 6))
+          ],
         ),
         child: Row(
           children: [
             Expanded(
               child: Text(
                 Strings.roadUnavailable,
-                style: TextStyle(color: p.ink, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: p.ink, fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
-            if (onRetry != null) TextButton(onPressed: onRetry, child: const Text(Strings.retry)),
+            if (onRetry != null)
+              TextButton(onPressed: onRetry, child: const Text(Strings.retry)),
           ],
         ),
       ),

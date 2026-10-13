@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+const brandNavy = Color(0xFF0E2350);
+const brandBlue = Color(0xFF0765F7);
+const destinationOrange = Color(0xFFFE6E01);
+
 /// The customer web tokens in apps/web/src/app/globals.css, light and dark.
 /// Screens read them with `context.palette` so they follow the active theme
 /// (the device setting, or the choice saved by the theme toggle).
 ///
 /// Names match the CSS custom properties: `ink` is the text colour (it turns
 /// light in the dark theme), while `solidInk` and `inkDeep` stay dark in both
-/// themes for panels and icon tiles. `accent` is the orange brand colour and
+/// themes for panels and icon tiles. `accent` is the blue brand colour and
 /// `onBrand` the text on it.
 @immutable
 class AppPalette extends ThemeExtension<AppPalette> {
@@ -56,44 +60,44 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   static const light = AppPalette(
     ink: Color(0xFF19231F),
-    inkDeep: Color(0xFF183D30),
-    solidInk: Color(0xFF19231F),
-    ground: Color(0xFFF6F8F5),
+    inkDeep: brandNavy,
+    solidInk: brandNavy,
+    ground: Color(0xFFF5F6F8),
     surface: Color(0xFFFFFFFF),
-    accent: Color(0xFFE84616),
-    accentHover: Color(0xFFCC3B10),
-    accentSoft: Color(0xFFFFF7F2),
+    accent: brandBlue,
+    accentHover: Color(0xFF0554D1),
+    accentSoft: Color(0xFFEEF5FF),
     onBrand: Color(0xFFFFFFFF),
     line: Color(0xFFDFE4DF),
     lineStrong: Color(0xFFDFE4DF),
     muted: Color(0xFF626B65),
-    mint: Color(0xFFB1D6C3),
-    mintSoft: Color(0xFFE4F1E8),
+    mint: Color(0xFFC7DCFF),
+    mintSoft: Color(0xFFEEF5FF),
     error: Color(0xFFB42318),
     errorBg: Color(0xFFFFF4F1),
-    entryEnd: Color(0xFFEEF5EF),
-    termsLine: Color(0xFFF1D7C8),
+    entryEnd: Color(0xFFF5F6F8),
+    termsLine: Color(0xFFC7DCFF),
   );
 
   static const dark = AppPalette(
-    ink: Color(0xFFEDF3EF),
-    inkDeep: Color(0xFF183D30),
-    solidInk: Color(0xFF10271F),
-    ground: Color(0xFF101814),
-    surface: Color(0xFF1C2922),
-    accent: Color(0xFFE84616),
-    accentHover: Color(0xFFFF9B78),
-    accentSoft: Color(0xFF35251E),
+    ink: Color(0xFFEDF1F7),
+    inkDeep: brandNavy,
+    solidInk: brandNavy,
+    ground: Color(0xFF111827),
+    surface: Color(0xFF1E2736),
+    accent: brandBlue,
+    accentHover: Color(0xFF0554D1),
+    accentSoft: Color(0xFF162E53),
     onBrand: Color(0xFFFFFFFF),
-    line: Color(0xFF394A40),
-    lineStrong: Color(0xFF607568),
-    muted: Color(0xFFB7C5BD),
-    mint: Color(0xFFB1D6C3),
-    mintSoft: Color(0xFF253F32),
+    line: Color(0xFF3C4656),
+    lineStrong: Color(0xFF64748B),
+    muted: Color(0xFFBAC5D6),
+    mint: Color(0xFFC7DCFF),
+    mintSoft: Color(0xFF162E53),
     error: Color(0xFFFFB4A8),
     errorBg: Color(0xFF3B2220),
-    entryEnd: Color(0xFF14241B),
-    termsLine: Color(0xFF765341),
+    entryEnd: Color(0xFF111827),
+    termsLine: Color(0xFF375784),
   );
 
   @override
@@ -133,12 +137,14 @@ extension AppPaletteContext on BuildContext {
   AppPalette get palette {
     final theme = Theme.of(this);
     return theme.extension<AppPalette>() ??
-        (theme.brightness == Brightness.dark ? AppPalette.dark : AppPalette.light);
+        (theme.brightness == Brightness.dark
+            ? AppPalette.dark
+            : AppPalette.light);
   }
 }
 
-/// Shadow under bottom sheets: `0 -8px 28px #183d3024` on the web.
-const sheetShadowColor = Color(0x24183D30);
+/// The deployed web's navy shadow under customer sheets.
+const sheetShadowColor = Color(0x240E2350);
 
 ThemeData buildAppTheme(Brightness brightness) {
   final p = brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
@@ -160,12 +166,15 @@ ThemeData buildAppTheme(Brightness brightness) {
   );
   final base = ThemeData(
     useMaterial3: true,
+    fontFamily: 'Golos Text',
     colorScheme: scheme,
     scaffoldBackgroundColor: p.ground,
     extensions: <ThemeExtension<dynamic>>[p],
   );
-  final shape14 = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
-  const buttonText = TextStyle(fontWeight: FontWeight.w700, fontSize: 18);
+  final shape14 =
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+  const buttonText = TextStyle(
+      fontFamily: 'Golos Text', fontWeight: FontWeight.w700, fontSize: 18);
   return base.copyWith(
     // Body text is the main ink colour, as on the web; secondary text sets
     // `palette.muted` explicitly.
@@ -197,7 +206,7 @@ ThemeData buildAppTheme(Brightness brightness) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: p.ink, width: 2),
+        borderSide: BorderSide(color: p.accent, width: 2),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -252,7 +261,8 @@ ThemeData buildAppTheme(Brightness brightness) {
       backgroundColor: p.surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      titleTextStyle: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700),
+      titleTextStyle:
+          TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700),
       contentTextStyle: TextStyle(color: p.muted, fontSize: 15),
     ),
     popupMenuTheme: PopupMenuThemeData(
@@ -270,5 +280,6 @@ ThemeData buildAppTheme(Brightness brightness) {
 final ButtonStyle accentButtonStyle = ElevatedButton.styleFrom(
   minimumSize: const Size.fromHeight(52),
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+  textStyle: const TextStyle(
+      fontFamily: 'Golos Text', fontWeight: FontWeight.w700, fontSize: 18),
 );

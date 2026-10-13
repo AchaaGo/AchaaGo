@@ -91,6 +91,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   int _loaders = 0;
   String _paymentMethod = 'qpay';
   bool _busy = false;
+  bool _quoting = false;
   String? _error;
 
   @override
@@ -143,7 +144,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     // The customer may already have chosen a destination while the fix was
     // coming in: price the real pickup, not the city-centre placeholder.
     if (_dropoff != null) {
-      setState(() => _quote = null);
+      setState(_invalidateQuote);
       await _requote(AppScope.of(context));
     }
   }
@@ -154,7 +155,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     _debounce?.cancel();
     if (_editingTarget == 'pickup') _pickupTouched = true;
     setState(() {
-      _quote = null;
+      _invalidateQuote();
       _suggestions = const [];
       _searching = query.length >= 3;
       _searched = false;
@@ -195,6 +196,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     });
   }
 
+  // Cancel the right to publish an older route/price as soon as an address
+  // changes, rather than waiting for the next request to start.
+  void _invalidateQuote() {
+    _quoteRevision++;
+    _quote = null;
+    _quoting = false;
+  }
+
   /// Switches the shared search field to edit [target], preloading it with
   /// that row's current address (blank for the default GPS pickup) —
   /// mirrors apps/web's `editAddress`.
@@ -233,7 +242,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _suggestions = const [];
       _searching = false;
       _searched = false;
-      _quote = null;
+      _invalidateQuote();
     });
     await _requote(AppScope.of(context));
   }
@@ -274,7 +283,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _suggestions = const [];
       _searching = false;
       _searched = false;
-      _quote = null;
+      _invalidateQuote();
       _error = null;
       _busy = true;
     });
@@ -301,7 +310,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     setState(() {
       _busy = true;
       _error = null;
-      _quote = null;
+      _invalidateQuote();
       _suggestions = const [];
       _searching = false;
       _searched = false;
@@ -335,7 +344,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final pickup = _pickup;
     final revision = ++_quoteRevision;
     setState(() {
-      _busy = true;
+      _quote = null;
+      _quoting = true;
       _error = null;
     });
     try {
@@ -350,12 +360,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         });
       }
     } finally {
-      if (mounted && revision == _quoteRevision) setState(() => _busy = false);
+      if (mounted && revision == _quoteRevision) {
+        setState(() => _quoting = false);
+      }
     }
   }
 
   void _toggleLoader(bool value) {
-    setState(() => _loaders = value ? 1 : 0);
+    setState(() {
+      _loaders = value ? 1 : 0;
+      _invalidateQuote();
+    });
     _requote(AppScope.of(context));
   }
 
@@ -368,6 +383,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   }
 
   Future<void> _placeOrder() async {
+    if (_busy || _quoting) return;
     final appState = AppScope.of(context);
     final dropoff = _dropoff;
     final quote = _quote;
@@ -445,35 +461,85 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final selectedPrice = _quote?.priceFor(_selectedServiceId);
-    final canRetryQuote =
-        !_pickupPending && _dropoff != null && _quote == null && !_busy;
+    final canRetryQuote = !_pickupPending &&
+        _dropoff != null &&
+        _quote == null &&
+        !_busy &&
+        !_quoting;
     return Scaffold(
       body: SafeArea(
         child: MapSheetScreen(
           backgroundHeight:
-              (MediaQuery.sizeOf(context).height * 0.32).clamp(220.0, 320.0),
-          background: LiveMapView(
-            pickup: _pickupPending ? null : _pickup,
-            dropoff: _dropoff,
-            routePolyline: _quote?.polyline,
-            // Only once priced, like the web: an unpriced pair has no route.
-            showRoute: !_pickupPending && _dropoff != null && _quote != null,
-            onPick: _pickOnMap,
-            onRetryRoute:
-                _busy ? null : () => _requote(AppScope.of(context)),
-          ),
+              (MediaQuery.sizeOf(context).height * 0.36).clamp(240.0, 340.0),
+          background: Stack(fit: StackFit.expand, children: [
+            LiveMapView(
+              pickup: _pickupPending ? null : _pickup,
+              dropoff: _dropoff,
+              routePolyline: _quote?.polyline,
+              // Only once priced, like the web: an unpriced pair has no route.
+              showRoute: !_pickupPending && _dropoff != null && _quote != null,
+              onPick: _pickOnMap,
+              onRetryRoute: _busy || _quoting
+                  ? null
+                  : () => _requote(AppScope.of(context)),
+            ),
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Material(
+                color: p.surface,
+                shape: const CircleBorder(),
+                child: const ThemeToggleButton(),
+              ),
+            ),
+          ]),
           header: _buildRouteHeader(),
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            if (_dropoff != null) ...[
+              Container(
+                key: const ValueKey('selected-destination'),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: p.accentSoft,
+                  border: Border.all(color: p.line),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.place_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(Strings.selectedDestination,
+                              style: TextStyle(color: p.muted, fontSize: 13)),
+                          const SizedBox(height: 4),
+                          Text(_dropoff!.address,
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w700)),
+                        ],
+                      )),
+                    ]),
+              ),
+              const SizedBox(height: 18),
+            ],
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 const Text(Strings.chooseVehicle,
-                    style:
-                        TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                    style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17)),
                 if (_quote != null)
                   Text(
-                      '${_quote!.distanceKm.toStringAsFixed(1)} км · ~${_quote!.durationMinutes} мин',
-                      style: TextStyle(color: p.muted)),
+                      '${_quote!.distanceKm.toStringAsFixed(2)} км · ~${_quote!.durationMinutes} мин',
+                      style: TextStyle(color: p.muted, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 10),
@@ -485,15 +551,19 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     setState(() => _selectedServiceId = price.service.id),
               ),
             const SizedBox(height: 4),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _loaders > 0,
-              onChanged: _busy ? null : _toggleLoader,
-              activeThumbColor: p.onBrand,
-              title: const Text(Strings.addLoader,
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('+${formatMoney(_quote?.loaderRate ?? 25000)}'),
-            ),
+            Material(
+                color: p.surface,
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _loaders > 0,
+                  onChanged: _busy || _quoting
+                      ? null
+                      : (value) => _toggleLoader(value ?? false),
+                  title: const Text(Strings.addLoader,
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle:
+                      Text('+${formatMoney(_quote?.loaderRate ?? 25000)}'),
+                )),
             Row(
               children: [
                 Expanded(
@@ -525,7 +595,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               ),
             PrimaryButton(
               accent: true,
-              busy: _busy,
+              busy: _busy || _quoting,
               label: Strings.orderButton(
                   selectedPrice?.service.nameMn ?? 'Машин',
                   formatMoney(selectedPrice?.breakdown.total ?? 0)),
@@ -536,7 +606,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   ? null
                   : _placeOrder,
             ),
-            if (_pickupPending || _dropoff == null || (_quote == null && !_busy))
+            if (_pickupPending ||
+                _dropoff == null ||
+                (_quote == null && !_busy && !_quoting))
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -558,6 +630,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   Widget _buildRouteHeader() {
     final editingPickup = _editingTarget == 'pickup';
     final queryLength = _searchController.text.trim().length;
+    final p = context.palette;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       color: context.palette.surface,
@@ -568,7 +641,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             IconButton(
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.arrow_back),
-              tooltip: 'Буцах',
+              style: IconButton.styleFrom(backgroundColor: p.ground),
+              tooltip: Strings.back,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -576,15 +650,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                   Text(Strings.searchPrompt,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                  Text(Strings.routeSearchHelp,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontFamily: 'Unbounded',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700)),
+                  Text(
+                      editingPickup
+                          ? Strings.pickupSearchHelp
+                          : Strings.routeSearchHelp,
                       style: TextStyle(
                           color: context.palette.muted, fontSize: 13)),
                 ])),
-            const ThemeToggleButton(),
           ]),
           const SizedBox(height: 12),
           Row(children: [
@@ -602,8 +678,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           ]),
           const SizedBox(height: 12),
           _buildAddressField(
-            target: _editingTarget,
-            dot: editingPickup,
             hint: editingPickup
                 ? Strings.searchPickup
                 : Strings.searchDestination,
@@ -616,23 +690,36 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 child: const Text(Strings.useCurrentLocation),
               ),
             ),
-          if (_searching)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
+          if (_searching || _quoting)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
               child: Row(children: [
-                SizedBox(
+                const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 10),
-                Text(Strings.searchPlacesLoading),
+                const SizedBox(width: 10),
+                Text(_searching
+                    ? Strings.searchPlacesLoading
+                    : Strings.quoteLoading),
               ]),
             ),
-          if (!_searching && queryLength > 0 && queryLength < 3)
+          if (!_searching && !_quoting && queryLength > 0 && queryLength < 3)
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Text(Strings.searchPlacesShort,
                   style: TextStyle(color: context.palette.muted)),
+            ),
+          if (!_searching &&
+              !_quoting &&
+              (editingPickup ? !_pickupPending : _dropoff != null))
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                  editingPickup
+                      ? Strings.selectedPickup
+                      : Strings.selectedDestination,
+                  style: TextStyle(color: p.muted, fontSize: 13)),
             ),
           if (_suggestions.isNotEmpty)
             Card(
@@ -645,6 +732,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   itemBuilder: (context, index) {
                     final suggestion = _suggestions[index];
                     return ListTile(
+                      key: ValueKey('suggestion-${suggestion.id}'),
                       leading: const Icon(Icons.place_outlined),
                       title: Text(suggestion.address),
                       onTap: _busy ? null : () => _pickPlace(suggestion),
@@ -667,86 +755,45 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     );
   }
 
-  Widget _buildAddressField(
-      {required String target, required bool dot, required String hint}) {
-    if (_editingTarget == target) {
-      return _AddressRow(
-        dot: dot,
-        child: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          enabled: !_busy,
-          onChanged: _onSearchChanged,
-          decoration: InputDecoration(
-            hintText: hint,
-            isDense: true,
-            suffixIcon: _searchController.text.isEmpty
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Хаяг арилгах',
-                    onPressed: _busy
-                        ? null
-                        : () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                            _searchFocusNode.requestFocus();
-                          },
-                  ),
-          ),
+  Widget _buildAddressField({required String hint}) {
+    final p = context.palette;
+    return TextField(
+      key: const ValueKey('address-search'),
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      enabled: !_busy,
+      onChanged: _onSearchChanged,
+      textInputAction: TextInputAction.search,
+      autocorrect: false,
+      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        prefixIcon: const Icon(Icons.place_outlined, size: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: p.ink, width: 2),
         ),
-      );
-    }
-    final address = target == 'pickup' ? _pickup.address : _dropoff?.address;
-    return _AddressRow(
-      dot: dot,
-      child: InkWell(
-        onTap: () => _startEditing(target),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                address ?? hint,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: address == null ? context.palette.muted : null),
+        suffixIcon: _searchController.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.close),
+                style: IconButton.styleFrom(
+                  backgroundColor: p.ground,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                tooltip: Strings.clearAddress,
+                onPressed: _busy
+                    ? null
+                    : () {
+                        _searchController.clear();
+                        _onSearchChanged('');
+                        _searchFocusNode.requestFocus();
+                      },
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(Strings.changeAddress,
-                style: TextStyle(
-                    color: context.palette.ink,
-                    decoration: TextDecoration.underline,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13)),
-          ],
-        ),
       ),
     );
-  }
-}
-
-class _AddressRow extends StatelessWidget {
-  const _AddressRow({required this.dot, required this.child});
-
-  final bool dot;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final marker = dot
-        ? CircleAvatar(radius: 5, backgroundColor: p.ink)
-        : Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-                color: p.accent, border: Border.all(color: p.ink, width: 2)),
-          );
-    return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [marker, const SizedBox(width: 10), Expanded(child: child)]);
   }
 }
 
@@ -769,7 +816,11 @@ class _AddressTab extends StatelessWidget {
         side: BorderSide(
             color: selected ? p.accent : p.line, width: selected ? 2 : 1),
       ),
-      child: Text(label, textAlign: TextAlign.center),
+      child: Text(label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontWeight: FontWeight.w700,
+              decoration: selected ? TextDecoration.underline : null)),
     );
   }
 }
@@ -791,18 +842,19 @@ class _ServicePriceRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: selected ? p.accentSoft : p.surface,
-            border: Border.all(
-                color: selected ? p.accent : p.line, width: 2),
+            border: Border.all(color: selected ? p.accent : p.line, width: 2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: p.inkDeep,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                    color: p.inkDeep, borderRadius: BorderRadius.circular(12)),
                 child: Icon(
                   price.service.icon == 'package'
                       ? Icons.inventory_2_outlined
@@ -849,8 +901,7 @@ class _PaymentOption extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           backgroundColor: selected ? p.accentSoft : p.surface,
-          side: BorderSide(
-              color: selected ? p.accent : p.line, width: 2),
+          side: BorderSide(color: selected ? p.accent : p.line, width: 2),
         ),
         child: Text(label),
       ),

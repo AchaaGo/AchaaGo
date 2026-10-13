@@ -18,7 +18,12 @@ void main() {
     final p = entry.value;
     group('${entry.key} palette', () {
       test('body text is readable on every background it sits on', () {
-        for (final background in [p.ground, p.surface, p.accentSoft, p.mintSoft]) {
+        for (final background in [
+          p.ground,
+          p.surface,
+          p.accentSoft,
+          p.mintSoft
+        ]) {
           expect(contrast(p.ink, background), greaterThanOrEqualTo(4.5));
         }
       });
@@ -35,14 +40,16 @@ void main() {
         }
       });
 
-      test('white button text on the orange brand colour meets the large-text minimum', () {
+      test(
+          'white button text on the blue brand colour meets the large-text minimum',
+          () {
         // Buttons use 18 px bold text, which WCAG treats as large text (3:1).
         expect(contrast(p.onBrand, p.accent), greaterThanOrEqualTo(3.0));
       });
 
-      test('the dark-green login header and icon tiles are legible', () {
+      test('the navy login header and icon tiles are legible', () {
         expect(contrast(p.onBrand, p.inkDeep), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.accent, p.inkDeep), greaterThanOrEqualTo(3.0));
+        expect(contrast(p.mint, p.inkDeep), greaterThanOrEqualTo(4.5));
         expect(contrast(p.mint, p.inkDeep), greaterThanOrEqualTo(3.0));
       });
     });
@@ -58,7 +65,8 @@ void main() {
 
   test('lerp blends two palettes and ignores a foreign extension', () {
     final halfway = AppPalette.light.lerp(AppPalette.dark, 0.5);
-    expect(halfway.ground, Color.lerp(AppPalette.light.ground, AppPalette.dark.ground, 0.5));
+    expect(halfway.ground,
+        Color.lerp(AppPalette.light.ground, AppPalette.dark.ground, 0.5));
     expect(AppPalette.light.lerp(null, 0.5), same(AppPalette.light));
   });
 
@@ -66,13 +74,16 @@ void main() {
     test('each brightness carries its own palette', () {
       expect(buildAppTheme(Brightness.light).brightness, Brightness.light);
       expect(buildAppTheme(Brightness.dark).brightness, Brightness.dark);
-      expect(buildAppTheme(Brightness.light).extension<AppPalette>(), same(AppPalette.light));
-      expect(buildAppTheme(Brightness.dark).extension<AppPalette>(), same(AppPalette.dark));
+      expect(buildAppTheme(Brightness.light).extension<AppPalette>(),
+          same(AppPalette.light));
+      expect(buildAppTheme(Brightness.dark).extension<AppPalette>(),
+          same(AppPalette.dark));
     });
 
     test('the page, text and buttons use the palette', () {
       for (final brightness in Brightness.values) {
-        final p = brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
+        final p =
+            brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
         final theme = buildAppTheme(brightness);
         expect(theme.scaffoldBackgroundColor, p.ground);
         expect(theme.colorScheme.primary, p.accent);
@@ -82,12 +93,14 @@ void main() {
         expect(button.backgroundColor!.resolve({}), p.accent);
         expect(button.foregroundColor!.resolve({}), p.onBrand);
         expect(button.backgroundColor!.resolve({WidgetState.disabled}), p.line);
-        expect(button.foregroundColor!.resolve({WidgetState.disabled}), p.muted);
+        expect(
+            button.foregroundColor!.resolve({WidgetState.disabled}), p.muted);
       }
     });
   });
 
-  testWidgets('context.palette follows the theme and falls back without one', (tester) async {
+  testWidgets('context.palette follows the theme and falls back without one',
+      (tester) async {
     late AppPalette seen;
     Future<void> show(ThemeData? theme) async {
       await tester.pumpWidget(MaterialApp(

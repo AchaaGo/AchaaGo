@@ -38,6 +38,12 @@ class Strings {
   static const searchPrompt = 'Хаашаа ачих вэ?';
   static const routeSearchHelp =
       'Хүргэх хаягаа хайх эсвэл газрын зураг дээр сонгоно уу.';
+  static const pickupSearchHelp =
+      'Авах хаягаа хайх эсвэл газрын зураг дээр сонгоно уу.';
+  static const selectedPickup = 'Сонгосон авах хаяг';
+  static const selectedDestination = 'Сонгосон хүргэх хаяг';
+  static const quoteLoading = 'Хаяг, үнийг шинэчилж байна…';
+  static const clearAddress = 'Хаяг арилгах';
   static const pickupTab = 'Авах газар';
   static const dropoffTab = 'Хүргэх газар';
   static const startingPricePrefix = 'Эхлэх үнэ ';

@@ -15,13 +15,13 @@ const lightMapStyle = '''
 
 const darkMapStyle = '''
 [
-  {"elementType":"geometry","stylers":[{"color":"#18251e"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#b7c5bd"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#18251e"}]},
+  {"elementType":"geometry","stylers":[{"color":"#182130"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#bac5d6"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#182130"}]},
   {"featureType":"poi","elementType":"labels","stylers":[{"visibility":"off"}]},
   {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#43564a"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#46546b"}]},
   {"featureType":"road","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0d1b22"}]}
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#101b2d"}]}
 ]
 ''';
