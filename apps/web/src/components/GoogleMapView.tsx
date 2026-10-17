@@ -2,6 +2,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {loadGoogleMaps, readLocationPermission, shouldShowRealMap, type LocationPermission, type MapSdkState} from '@/lib/googleMaps';
 import {roadRoute} from '@/lib/roadRoute';
+import type {TrafficRoute} from '@/lib/trafficRoutes';
 import {customerCopy as copy} from './customerCopy';
 import {MapBackdrop} from './MapBackdrop';
 
@@ -10,6 +11,9 @@ type LatLng = {lat: number; lng: number};
 type Props = {
   route?: boolean;
   routePolyline?: string | null;
+  routeOptions?: TrafficRoute[];
+  selectedRouteId?: string;
+  onRouteSelect?: (id: string) => void;
   pulse?: boolean;
   truck?: boolean;
   pickup?: LatLng | null;
@@ -59,7 +63,7 @@ function currentMaps(): typeof google.maps | null {
 }
 
 /** Draw provider road geometry; never substitute an endpoint-to-endpoint line. */
-export function GoogleMapView({route = false, routePolyline, pulse = false, truck = false, pickup, dropoff, driverLocation, onPick}: Props) {
+export function GoogleMapView({route = false, routePolyline, routeOptions, selectedRouteId, onRouteSelect, pulse = false, truck = false, pickup, dropoff, driverLocation, onPick}: Props) {
   const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   const [sdkState, setSdkState] = useState<MapSdkState>('idle');
   const [routeState,setRouteState]=useState<'idle'|'loading'|'ready'|'error'>('idle');
@@ -74,8 +78,10 @@ export function GoogleMapView({route = false, routePolyline, pulse = false, truc
   const truckMarkerRef = useRef<google.maps.Marker | null>(null);
   const routeLinesRef = useRef<google.maps.Polyline[]>([]);
   const onPickRef = useRef(onPick);
+  const onRouteSelectRef = useRef(onRouteSelect);
   useEffect(() => {
     onPickRef.current = onPick;
+    onRouteSelectRef.current = onRouteSelect;
   });
 
   useEffect(() => {
@@ -169,6 +175,28 @@ export function GoogleMapView({route = false, routePolyline, pulse = false, truc
     if(pickup&&dropoff){const bounds=new maps.LatLngBounds();bounds.extend(pickup);bounds.extend(dropoff);map.fitBounds(bounds,48)}
     else if(pickup||dropoff)map.panTo((pickup||dropoff)!);
     if(!route||!pickup||!dropoff){setRouteState('idle');return}
+    if (routeOptions !== undefined) {
+      // Booking owns calculation/selection. Tracking retains its original route path.
+      setRouteState('idle');
+      const selected = routeOptions.find(option => option.id === selectedRouteId) ?? routeOptions[0];
+      const bounds = new maps.LatLngBounds();
+      bounds.extend(pickup); bounds.extend(dropoff);
+      for (const option of routeOptions) {
+        const active = option === selected;
+        const outline = new maps.Polyline({map,path:option.path,strokeColor:'#ffffff',strokeWeight:active?9:6,strokeOpacity:active?1:0.6,zIndex:active?4:0,clickable:false});
+        const line = new maps.Polyline({map,path:option.path,strokeColor:active?cssColor('--brand-blue'):'#7b8794',strokeWeight:active?5:3,strokeOpacity:active?1:0.75,zIndex:active?5:1,clickable:true});
+        line.addListener('click',(event:google.maps.MapMouseEvent) => {event.stop();onRouteSelectRef.current?.(option.id)});
+        lines.push(outline,line);
+        option.path.forEach(point => bounds.extend(point));
+        if (active) for (const segment of option.speedPaths) {
+          if (segment.speed === 'NORMAL') continue;
+          lines.push(new maps.Polyline({map,path:segment.path,strokeColor:segment.speed==='SLOW'?'#d97706':'#dc2626',strokeWeight:5,strokeOpacity:1,zIndex:6,clickable:false}));
+        }
+      }
+      routeLinesRef.current = lines;
+      if (selected) map.fitBounds(bounds,48);
+      return () => {lines.forEach(line => {maps.event.clearInstanceListeners(line);line.setMap(null)})};
+    }
     setRouteState('loading');
     Promise.race([
       roadRoute(maps,pickup,dropoff,routePolyline),
@@ -185,7 +213,7 @@ export function GoogleMapView({route = false, routePolyline, pulse = false, truc
       setRouteState('ready');
     }).catch(()=>{if(!cancelled)setRouteState('error')}).finally(()=>{if(timeout)clearTimeout(timeout)});
     return()=>{cancelled=true;if(timeout)clearTimeout(timeout);lines.forEach(line=>line.setMap(null))};
-  },[showMap,route,pickup?.lat,pickup?.lng,dropoff?.lat,dropoff?.lng,routePolyline,retryRoute]);
+  },[showMap,route,pickup?.lat,pickup?.lng,dropoff?.lat,dropoff?.lng,routePolyline,retryRoute,routeOptions,selectedRouteId]);
 
   useEffect(() => {
     return () => {

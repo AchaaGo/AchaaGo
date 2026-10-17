@@ -9,6 +9,8 @@ import {PhoneLogin} from './PhoneLogin';
 import {QpayDialog} from './QpayDialog';
 import {CustomerPanel} from './CustomerPanel';
 import {MapSheet} from './MapSheet';
+import {RouteSummary,routeMetrics} from './RouteSummary';
+import {useTrafficRoutes} from '@/lib/useTrafficRoutes';
 import {VehicleCards} from './VehicleCards';
 import {customerCopy as copy} from './customerCopy';
 
@@ -40,6 +42,7 @@ export function CustomerFlow() {
   const pickupTouched=useRef(false);
   const [places,setPlaces]=useState<PlaceRow[]>([]), [placesLoading,setPlacesLoading]=useState(false), [highlight,setHighlight]=useState(-1);
   const [quote,setQuote]=useState<Quote|null>(null), [loaders,setLoaders]=useState(0), [pay,setPay]=useState<'cash'|'qpay'>('qpay');
+  const traffic = useTrafficRoutes(screen==='route'&&pickupReady?pickup:null,screen==='route'?dropoff:null,quote?.polyline);
   const [order,setOrder]=useState<Order|null>(null), [busy,setBusy]=useState(false), [error,setError]=useState(''), [user,setUser]=useState<any>(null), [qpay,setQpay]=useState<any>(null);
   const [panel,setPanel]=useState<'menu'|'profile'|null>(null);
   const [disconnected,setDisconnected]=useState(false);
@@ -173,14 +176,15 @@ export function CustomerFlow() {
       {addressTarget==='pickup'&&<button type="button" className="text-button current-pickup" disabled={busy} onClick={useCurrentLocation}>{copy.useCurrentLocation}</button>}
       {places.length>0&&<div id="destination-listbox" role="listbox" aria-label={addressTarget==='pickup'?copy.pickupSuggestions:copy.destinationSuggestions} className="suggest-list">{places.map((p,index)=><button className="suggest-option" key={p.id} id={`place-option-${index}`} role="option" aria-selected={index===highlight} disabled={busy} onMouseEnter={()=>setHighlight(index)} onClick={()=>pickPlace(p)}><MapPin size={18} aria-hidden="true"/><span>{p.address}</span></button>)}</div>}
     </section>
-    <div className="map-stage"><GoogleMapView route={pickupReady&&!!dropoff&&!!quote} routePolyline={quote?.polyline} pickup={pickupReady?pickup:null} dropoff={dropoff} onPick={pickOnMap}/></div>
+    <div className="map-stage"><GoogleMapView route={pickupReady&&!!dropoff} routeOptions={traffic.routes} selectedRouteId={traffic.selectedRoute?.id} onRouteSelect={traffic.selectRoute} pickup={pickupReady?pickup:null} dropoff={dropoff} onPick={pickOnMap}/></div>
     <MapSheet key="route" className="booking-sheet" labelledBy="service-title">
+      <RouteSummary {...traffic}/>
       <dl className="booking-addresses">
         <div className="booking-stop pickup-stop"><dt>{copy.pickupLabel}</dt><dd>{pickupReady?pickup.address:copy.needsPickup}<button type="button" className="address-edit" disabled={busy} onClick={()=>editAddress('pickup')} aria-label={copy.changePickup}>{copy.changeAddress}</button></dd></div>
         <div className="booking-stop destination-stop"><dt>{copy.destinationLabel}</dt><dd>{dropoff?.address??copy.destinationPending}<button type="button" className="address-edit" disabled={busy} onClick={()=>editAddress('dropoff')} aria-label={copy.changeDestination}>{copy.changeAddress}</button></dd></div>
       </dl>
       {dropoff&&<div className="selected-address desktop-vehicle-selector"><MapPin size={19} aria-hidden="true"/><div><small>{copy.selectedAddress}</small><strong>{dropoff.address}</strong></div></div>}
-      <div className="section-heading"><h2 id="service-title" className="display">Машинаа сонго</h2>{quote&&<span className="muted">{quote.distance_km} км · ~{quote.duration_minutes} мин</span>}</div>
+      <div className="section-heading"><h2 id="service-title" className="display">Машинаа сонго</h2>{quote&&<span className="muted">{traffic.selectedRoute?routeMetrics(traffic.selectedRoute):`${quote.distance_km} км · ~${quote.duration_minutes} мин`}</span>}</div>
       <div className="service-options desktop-vehicle-selector">{(quote?.prices||services.map(service=>({service,breakdown:{total:service.base_fare}}))).map(p=><button className="service-option" key={p.service.id} disabled={busy} onClick={()=>setSelected(p.service.id)} aria-pressed={selected===p.service.id}><span className="service-icon" aria-hidden="true"><ServiceIcon type={p.service.icon}/></span><span className="service-description"><b>{p.service.name_mn}</b><small>{p.service.description_mn}</small></span><span className="service-amount">{!quote&&<small>{copy.basePrice}</small>}<b>{money(p.breakdown.total)}</b></span></button>)}</div>
       <VehicleCards services={services} quote={quote} selected={selected} busy={busy} onSelect={setSelected}/>
       <label className="loader-option"><span><b>Ачигч нэмэх</b><small>+{money(quote?.loader_rate??25000)}</small></span><input type="checkbox" checked={loaders>0} disabled={busy} onChange={e=>requote(e.target.checked?1:0)}/></label>

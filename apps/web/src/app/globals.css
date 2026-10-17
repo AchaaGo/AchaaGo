@@ -310,6 +310,17 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 
 /* Mobile map sheets move independently from the map and scroll their own content. */
 .map-sheet-handle { display:none; }
+.traffic-summary { margin:0 0 12px; padding:10px 0; color:var(--ink); font-size:13px; overflow-wrap:anywhere; }
+.traffic-summary-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 10px; }
+.traffic-summary p { margin:5px 0; color:var(--muted); font-size:12px; }
+.traffic-summary small { display:block; margin-top:5px; color:var(--muted); font-size:11px; }
+.traffic-options { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.traffic-summary button { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-height:44px; max-width:100%; padding:8px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:12px; cursor:pointer; }
+.traffic-summary button[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
+.traffic-legend { display:flex; flex-wrap:wrap; gap:10px; }
+.traffic-legend span { display:inline-flex; align-items:center; gap:4px; }
+.traffic-legend i { width:12px; height:4px; background:#d97706; }
+.traffic-legend i[data-speed="TRAFFIC_JAM"] { background:#dc2626; }
 @media (max-width:767px) {
   .phone.customer-screen.map-sheet-screen { height:100dvh; min-height:0; max-height:none; overflow:hidden; }
   .map-sheet-screen > .route-search { flex-shrink:0; }
