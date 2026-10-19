@@ -11,6 +11,8 @@ import {CustomerPanel} from './CustomerPanel';
 import {MapSheet} from './MapSheet';
 import {RouteSummary,routeMetrics} from './RouteSummary';
 import {useTrafficRoutes} from '@/lib/useTrafficRoutes';
+import {What3WordsInput} from './What3WordsInput';
+import type {AddressMethod} from '@/lib/what3words';
 import {VehicleCards} from './VehicleCards';
 import {customerCopy as copy} from './customerCopy';
 
@@ -38,6 +40,8 @@ export function CustomerFlow() {
   const [screen,setScreen]=useState<Screen>('loading'), [services,setServices]=useState<Service[]>([]), [selected,setSelected]=useState('');
   const [pickup,setPickup]=useState<Point>(fallback), [dropoff,setDropoff]=useState<Point|null>(null), [search,setSearch]=useState('');
   const [addressTarget,setAddressTarget]=useState<'pickup'|'dropoff'>('dropoff');
+  const [addressMethods,setAddressMethods]=useState<{pickup:AddressMethod;dropoff:AddressMethod}>({pickup:'google',dropoff:'google'});
+  const [wordDrafts,setWordDrafts]=useState({pickup:'',dropoff:''});
   const [pickupReady,setPickupReady]=useState(true);
   const pickupTouched=useRef(false);
   const [places,setPlaces]=useState<PlaceRow[]>([]), [placesLoading,setPlacesLoading]=useState(false), [highlight,setHighlight]=useState(-1);
@@ -83,6 +87,16 @@ export function CustomerFlow() {
     setSearch(place.address);updatePlaces([]);
     if(nextDropoff&&(addressTarget==='pickup'||pickupReady))setQuote(await api<Quote>('/quotes',{method:'POST',body:JSON.stringify({pickup:nextPickup,dropoff:nextDropoff,loaders})}));
   }
+  function changeAddressMethod(method:AddressMethod) {
+    if(busy)return;
+    editAddress(addressTarget);
+    setAddressMethods(current=>({...current,[addressTarget]:method}));
+  }
+  async function pickWords(point:Point) {
+    if(busy)return;
+    setQuote(null);setBusy(true);setError('');
+    try{await applyPlace(point)}catch(error){setError(customerError(error))}finally{setBusy(false)}
+  }
   function searchPlaces(value:string){setError('');setSearched(false);updatePlaces([]);setSearch(value);if(addressTarget==='pickup'){pickupTouched.current=true;setPickupReady(false)}else setDropoff(null);setQuote(null);if(searchTimer.current)clearTimeout(searchTimer.current);const query=value.trim();const token=staleGuard.start();if(query.length<3){updatePlaces([]);setPlacesLoading(false);sessionToken.current=null;return}setPlacesLoading(true);searchTimer.current=setTimeout(()=>runSearch(query,token),300)}
   async function runSearch(query:string,token:number){
     if(isGooglePlacesAvailable()){
@@ -107,6 +121,7 @@ export function CustomerFlow() {
   }
   async function pickOnMap(point:{lat:number;lng:number}){
     if(busy)return;
+    setAddressMethods(current=>({...current,[addressTarget]:'google'}));
     if(searchTimer.current)clearTimeout(searchTimer.current);
     setSearched(false);setQuote(null);setBusy(true);setError('');
     try{staleGuard.start();sessionToken.current=null;setPlacesLoading(false);let address:string=copy.mapPoint;try{address=await reverseGeocode(point)}catch{}await applyPlace({...point,address})}
@@ -170,11 +185,17 @@ export function CustomerFlow() {
         <button type="button" disabled={busy} aria-pressed={addressTarget==='pickup'} onClick={()=>editAddress('pickup')}>{copy.pickupLabel}</button>
         <button type="button" disabled={busy} aria-pressed={addressTarget==='dropoff'} onClick={()=>editAddress('dropoff')}>{copy.destinationLabel}</button>
       </div>
+      <div className="address-methods" role="group" aria-label={copy.addressMethod}>
+        <button type="button" disabled={busy} aria-pressed={addressMethods[addressTarget]==='google'} onClick={()=>changeAddressMethod('google')}>{copy.googleMaps}</button>
+        <button type="button" disabled={busy} aria-pressed={addressMethods[addressTarget]==='what3words'} onClick={()=>changeAddressMethod('what3words')}>{copy.what3words}</button>
+      </div>
+      {addressMethods[addressTarget]==='what3words'?<What3WordsInput key={addressTarget} label={addressTarget==='pickup'?copy.pickupLabel:copy.destinationLabel} value={wordDrafts[addressTarget]} onChange={value=>setWordDrafts(current=>({...current,[addressTarget]:value}))} onSelect={pickWords} onGoogle={()=>changeAddressMethod('google')} disabled={busy}/>:<>
       <label className="sr-only" htmlFor="destination">{addressTarget==='pickup'?copy.pickupLabel:copy.destinationLabel}</label>
       <div className="destination-field"><MapPin size={20} aria-hidden="true"/><input ref={searchInput} id="destination" value={search} disabled={busy} onChange={e=>searchPlaces(e.target.value)} onKeyDown={onSearchKeyDown} placeholder={addressTarget==='pickup'?copy.searchPickup:copy.searchDestination} role="combobox" aria-expanded={places.length>0} aria-controls={places.length>0?'destination-listbox':undefined} aria-autocomplete="list" aria-describedby="search-feedback" aria-activedescendant={highlight>=0&&places[highlight]?`place-option-${highlight}`:undefined} autoComplete="off"/>{search&&<button className="clear-search" disabled={busy} aria-label={addressTarget==='pickup'?copy.clearPickup:copy.clearDestination} onClick={()=>{searchPlaces('');searchInput.current?.focus()}}><X size={18} aria-hidden="true"/></button>}</div>
       <p id="search-feedback" className="search-feedback" role="status">{placesLoading?copy.searching:busy?copy.quoteLoading:(addressTarget==='pickup'?pickupReady:!!dropoff)?(addressTarget==='pickup'?copy.selectedPickup:copy.selectedAddress):searched&&!places.length&&!error?copy.noResults:search.trim().length>0&&search.trim().length<3?copy.searchShort:copy.searchHelp}</p>
       {addressTarget==='pickup'&&<button type="button" className="text-button current-pickup" disabled={busy} onClick={useCurrentLocation}>{copy.useCurrentLocation}</button>}
       {places.length>0&&<div id="destination-listbox" role="listbox" aria-label={addressTarget==='pickup'?copy.pickupSuggestions:copy.destinationSuggestions} className="suggest-list">{places.map((p,index)=><button className="suggest-option" key={p.id} id={`place-option-${index}`} role="option" aria-selected={index===highlight} disabled={busy} onMouseEnter={()=>setHighlight(index)} onClick={()=>pickPlace(p)}><MapPin size={18} aria-hidden="true"/><span>{p.address}</span></button>)}</div>}
+      </>}
     </section>
     <div className="map-stage"><GoogleMapView route={pickupReady&&!!dropoff} routeOptions={traffic.routes} selectedRouteId={traffic.selectedRoute?.id} onRouteSelect={traffic.selectRoute} pickup={pickupReady?pickup:null} dropoff={dropoff} onPick={pickOnMap}/></div>
     <MapSheet key="route" className="booking-sheet" labelledBy="service-title">

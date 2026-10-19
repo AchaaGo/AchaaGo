@@ -310,6 +310,16 @@ th { font-size:13px; color:var(--muted); background:var(--ground); }
 
 /* Mobile map sheets move independently from the map and scroll their own content. */
 .map-sheet-handle { display:none; }
+.address-methods { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+.address-methods button { min-height:44px; padding:8px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--muted); font-size:12px; cursor:pointer; }
+.address-methods button[aria-pressed="true"] { background:var(--accent-soft); color:var(--ink); border-color:var(--accent); font-weight:600; }
+.w3w-input { min-width:0; }
+.w3w-input .destination-field { min-width:0; }
+.w3w-input input { min-width:0; }
+.w3w-resolve { min-width:44px; min-height:44px; padding:6px; border:0; border-radius:8px; background:var(--accent-soft); color:var(--ink); font-size:12px; cursor:pointer; flex-shrink:0; }
+.w3w-input .suggest-option span { min-width:0; overflow-wrap:anywhere; }
+.w3w-input .suggest-option small { display:block; color:var(--muted); font-size:11px; }
+.w3w-back { min-height:44px; text-align:left; }
 .traffic-summary { margin:0 0 12px; padding:10px 0; color:var(--ink); font-size:13px; overflow-wrap:anywhere; }
 .traffic-summary-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 10px; }
 .traffic-summary p { margin:5px 0; color:var(--muted); font-size:12px; }
