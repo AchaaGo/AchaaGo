@@ -1,11 +1,19 @@
 // Run against a built web app. Authentication/logout and Maps are isolated fixtures.
-const assert=require('node:assert/strict');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 let chromium;try{({chromium}=require('@playwright/test'))}catch{({chromium}=require('playwright'))}
-const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
+const url='http://achaago.test',root=path.resolve(__dirname,'../.next');
 (async()=>{
- const browser=await chromium.launch({headless:true,channel:process.env.BOOKING_BROWSER||undefined});
+ const browser=await chromium.launch({headless:true,channel:process.env.BOOKING_BROWSER||'chrome'});
  try{for(const width of [320,390,430]){
-  const context=await browser.newContext({viewport:{width,height:700},reducedMotion:width===390?'reduce':'no-preference'});
+  const context=await browser.newContext({viewport:{width,height:568},colorScheme:width===390?'dark':'light',reducedMotion:width===390?'reduce':'no-preference'});
+  await context.route('**/*',async route=>{
+   const requestUrl=new URL(route.request().url());
+   if(requestUrl.origin!==url)return route.abort();
+   const rel=requestUrl.pathname.startsWith('/_next/static/')?requestUrl.pathname.replace('/_next/',''):requestUrl.pathname==='/'?'server/app/index.html':requestUrl.pathname==='/terms'?'server/app/terms.html':null;
+   if(!rel)return route.fulfill({status:404,body:''});
+   const file=path.resolve(root,rel);assert(file.startsWith(root+path.sep));
+   return route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.woff2')?'font/woff2':'text/html'});
+  });
   const page=await context.newPage();let logoutCalls=0,failLogout=true,signedIn=false;
   const user={phone:'+97699000003',...(width===430?{name:'Туршилтын хэрэглэгч'}:{})};
   await page.addInitScript(()=>{
@@ -33,8 +41,14 @@ const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   const before=await menu.boundingBox();
   await menu.click();const dialog=page.getByRole('dialog',{name:'Цэс',exact:true});await dialog.waitFor();
   assert.equal(await page.evaluate(()=>document.body.style.overflow),'hidden');
-  assert.equal(await dialog.locator('button:disabled').count(),4);
-  for(const label of ['Миний захиалгууд','Хадгалсан хаягууд','Тусламж','Жолооч болох'])assert.equal(await dialog.getByRole('button',{name:new RegExp(label)}).isDisabled(),true);
+  assert.equal(await dialog.locator('button:disabled').count(),3);
+  for(const label of ['Миний захиалгууд','Тусламж','Жолооч болох'])assert.equal(await dialog.getByRole('button',{name:new RegExp(label)}).isDisabled(),true);
+  assert.deepEqual(await dialog.locator('.customer-panel-label').allTextContents(),['Миний захиалгууд','Жолооч болох','Тусламж','Үйлчилгээний нөхцөл — Шинэ цонхонд нээгдэнэ']);
+  assert.equal(await dialog.getByRole('button',{name:'Гарах',exact:true}).count(),0);
+  await dialog.evaluate(e=>Promise.all(e.getAnimations().map(a=>a.finished)));
+  const closeBefore=await dialog.locator('.customer-panel-close').boundingBox();
+  await dialog.locator('.customer-panel-content').evaluate(e=>e.scrollTop=e.scrollHeight);
+  assert.deepEqual(await dialog.locator('.customer-panel-close').boundingBox(),closeBefore);
   assert.equal(await dialog.locator('.customer-order-dot').count(),0);
   for(let i=0;i<8;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>!!document.activeElement.closest('.map-toolbar,.home-search')),false);}
   const rows=await dialog.locator('.customer-panel-row').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().height));assert(rows.every(h=>h>=48));
@@ -50,7 +64,9 @@ const url=process.env.BOOKING_URL||'http://64.119.31.106:8187';
   await profile.click();const personal=page.getByRole('dialog',{name:'Профайл',exact:true});await personal.waitFor();
   assert.equal(await personal.locator('.customer-panel-identity strong').innerText(),user.name||'+976 9900 0003');
   assert.match(await personal.locator('.customer-panel-identity').innerText(),/\+976 9900 0003/);
-  assert.equal(await personal.locator('button:disabled').count(),3);
+  assert.equal(await personal.locator('button:disabled').count(),2);
+  assert.deepEqual(await personal.locator('.customer-panel-label').allTextContents(),['Хувийн мэдээлэл','Хадгалсан хаягууд']);
+  assert.equal(await personal.getByRole('link').count(),0);
   await personal.getByRole('button',{name:'Хаах',exact:true}).click();assert.equal(await profile.evaluate(e=>document.activeElement===e),true);
   await profile.click();await personal.getByRole('button',{name:'Гарах',exact:true}).click();await personal.getByRole('alert').waitFor();assert.equal(logoutCalls,1);
   assert.equal(await personal.getByRole('button',{name:'Гарах',exact:true}).isEnabled(),true);

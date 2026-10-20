@@ -1,5 +1,9 @@
 // Customer presentation strings. Keep transport and Maps helpers unchanged.
 export const customerCopy = {
+  myActivity: 'Миний үйл ажиллагаа',
+  panelServices: 'Үйлчилгээ',
+  helpInformation: 'Тусламж, мэдээлэл',
+  accountSettings: 'Бүртгэл',
   addressMethod: 'Хаяг оруулах арга',
   googleMaps: 'Google Maps',
   what3words: '/// what3words',
